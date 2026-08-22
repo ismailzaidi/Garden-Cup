@@ -6,6 +6,7 @@ import SetupView from "./views/SetupView.jsx";
 import StatsView from "./views/StatsView.jsx";
 import HistoryView from "./views/HistoryView.jsx";
 import SyncIndicator from "./components/SyncIndicator.jsx";
+import InstallPrompt from "./components/InstallPrompt.jsx";
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
 import { exportData, importData } from "./lib/exportImport.js";
@@ -169,6 +170,8 @@ function TournamentShell() {
           />
         )}
       </div>
+
+      <InstallPrompt />
     </div>
   );
 }
