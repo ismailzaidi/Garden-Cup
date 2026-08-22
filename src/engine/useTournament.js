@@ -117,13 +117,19 @@ export function useTournament() {
     setTab(result.initialTab || "setup");
   };
 
+  /* players carry over on purpose — the same people usually play the next
+     tournament too, and retyping names every round is the main friction.
+     No storage.delete here: the persist effect above picks up this state
+     change and re-saves the (still-populated) roster on its own debounce —
+     deleting first would leave a window with no persisted roster at all,
+     and in cloud mode would push an immediate delete to other devices
+     ahead of the write that puts the roster back. */
   const resetAll = () => {
-    setPlayers([]); setMatches([]); setGoals([]); setNameInput("");
+    setMatches([]); setGoals([]); setNameInput("");
     clearTimers();
     setModeState({});
     setMode("league"); setConfigState(defaultConfig());
     setTab("setup"); setTournamentId(makeId()); setHistorySaved(false);
-    storage.delete(CURRENT_KEY).catch(() => {});
   };
 
   const togglePlayed = (id) => setMatches((p) => p.map((m) => (m.id === id ? { ...m, played: !m.played } : m)));

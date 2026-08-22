@@ -5,6 +5,7 @@ import SectionLabel from "../components/SectionLabel.jsx";
 
 export default function SetupView({ players, nameInput, mode, config, matches, activeMode, actions }) {
   const atMaxPlayers = activeMode.maxPlayers && players.length >= activeMode.maxPlayers;
+  const overMaxPlayers = activeMode.maxPlayers && players.length > activeMode.maxPlayers;
 
   return (
     <>
@@ -57,7 +58,7 @@ export default function SetupView({ players, nameInput, mode, config, matches, a
             <Plus color="#F7F5EE" size={20} strokeWidth={3} />
           </button>
         </div>
-        {atMaxPlayers && <p className="text-[10px] mt-2" style={{ color: C.mute }}>This mode needs exactly {activeMode.maxPlayers} players.</p>}
+        {atMaxPlayers && !overMaxPlayers && <p className="text-[10px] mt-2" style={{ color: C.mute }}>This mode needs exactly {activeMode.maxPlayers} players.</p>}
       </div>
 
       {players.length > 0 && (
@@ -86,13 +87,16 @@ export default function SetupView({ players, nameInput, mode, config, matches, a
         </div>
       )}
 
-      <button onClick={actions.handleGenerate} disabled={players.length < activeMode.minPlayers}
+      <button onClick={actions.handleGenerate} disabled={players.length < activeMode.minPlayers || overMaxPlayers}
         className="w-full py-3.5 rounded-xl font-bold text-sm tracking-wide disabled:opacity-40 active:scale-[0.98] transition-transform"
         style={{ backgroundColor: C.gold, color: C.ink }}>
         {matches.length > 0 ? "REGENERATE (CLEARS SCORES)" : activeMode.generateLabel}
       </button>
       {players.length < activeMode.minPlayers && (
         <p className="text-xs text-center" style={{ color: C.mute }}>Add at least {activeMode.minPlayers} players to start</p>
+      )}
+      {overMaxPlayers && (
+        <p className="text-xs text-center" style={{ color: C.mute }}>This mode needs exactly {activeMode.maxPlayers} players — remove {players.length - activeMode.maxPlayers} to start</p>
       )}
     </>
   );
