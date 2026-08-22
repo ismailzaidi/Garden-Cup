@@ -14,6 +14,7 @@ export const MODE_STAGES = {
   chaos: ["chaos"],
   goldenboot: ["goldenboot"],
   survivor: ["survivor"],
+  penalties: ["pens"],
 };
 
 export function isValidMode(mode) {

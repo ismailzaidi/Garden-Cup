@@ -1,61 +1,17 @@
 import { useMemo } from "react";
 import { Swords, ChevronRight } from "lucide-react";
 import { C } from "../lib/theme.js";
-import { makeId, shuffle, randomOrder, matchWinner, roundLabel } from "../engine/match.js";
+import { roundLabel } from "../engine/match.js";
+import { generateKnockoutRound1, latestRoundState, bracketChampion, advanceBracket } from "../engine/bracket.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import MatchCard from "../components/MatchCard.jsx";
 
-export function generateKnockoutRound1(players, rng = Math.random) {
-  const shuffled = shuffle(players, rng);
-  let size = 1;
-  while (size < shuffled.length) size *= 2;
-  const slots = [...shuffled];
-  while (slots.length < size) slots.push(null);
-  const round = [];
-  for (let i = 0; i < slots.length; i += 2) {
-    const a = slots[i];
-    const b = slots[i + 1];
-    if (a && b) {
-      round.push({ id: makeId(), stage: "knockout", round: 1, p1: a.id, p2: b.id, s1: "0", s2: "0", played: false, bye: false });
-    } else if (a || b) {
-      round.push({ id: makeId(), stage: "knockout", round: 1, p1: (a || b).id, p2: null, s1: "0", s2: "0", played: true, bye: true });
-    }
-  }
-  return round;
-}
-
-function groupByRound(matches) {
-  const rounds = {};
-  matches.forEach((m) => { (rounds[m.round] = rounds[m.round] || []).push(m); });
-  const nums = Object.keys(rounds).map(Number).sort((a, b) => a - b);
-  return { rounds, nums };
-}
-
-function latestRoundState(matches) {
-  const { rounds, nums } = groupByRound(matches);
-  const latestRound = nums[nums.length - 1];
-  const latestMatches = rounds[latestRound] || [];
-  const winners = latestMatches.map(matchWinner);
-  const roundDecided = latestMatches.length > 0 && winners.every(Boolean);
-  const isFinalRound = latestMatches.length === 1;
-  return { rounds, nums, latestRound, latestMatches, winners, roundDecided, isFinalRound };
-}
-
 function champion({ players, matches }) {
-  const { roundDecided, isFinalRound, winners } = latestRoundState(matches);
-  const championId = isFinalRound && roundDecided ? winners[0] : null;
-  return championId ? players.find((p) => p.id === championId) ?? null : null;
+  return bracketChampion(players, matches);
 }
 
 export function advance({ matches, rng = Math.random }) {
-  const { latestRound, winners, roundDecided, isFinalRound } = latestRoundState(matches);
-  if (!roundDecided || isFinalRound) return { matches, modeState: {}, tab: "bracket" };
-  const next = [];
-  for (let i = 0; i < winners.length; i += 2) {
-    const [a, b] = randomOrder(winners[i], winners[i + 1], rng);
-    next.push({ id: makeId(), stage: "knockout", round: latestRound + 1, p1: a, p2: b, s1: "0", s2: "0", played: false, bye: false });
-  }
-  return { matches: [...matches, ...next], modeState: {}, tab: "bracket" };
+  return { matches: advanceBracket(matches, "knockout", rng), modeState: {}, tab: "bracket" };
 }
 
 function BracketView({ matches, nameOf, champion, timerControls, actions }) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateKnockoutRound1 } from "../src/modes/knockout.jsx";
+import { generateKnockoutRound1 } from "../src/engine/bracket.js";
 
 function seededRng(seed) {
   let s = seed;

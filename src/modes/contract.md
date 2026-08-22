@@ -140,8 +140,14 @@ redefining them:
 - `computeStandings`, `computeTopScorers`, `computeMinuteBuckets` — generic
   over any list of matches; also power the shared Stats tab.
 - `matchWinner`, `shuffle`, `randomOrder`, `roundLabel`, `makeId`.
-- `generateGroupMatches` — the round-robin generator used by both `league`
-  and `roundrobin`.
+- `generateGroupMatches` — the round-robin generator used by every mode with
+  a round-robin phase (`league`, `roundrobin`, `chaos`, `goldenboot`,
+  `survivor`). It stamps `stage: "group"`; a mode owning a different stage
+  remaps the returned matches rather than changing the generator.
+- `engine/bracket.js` — `generateKnockoutRound1`, `latestRoundState`,
+  `bracketChampion`, and `advanceBracket`, the single-elimination machinery
+  shared by `knockout` and `penalties`. `advanceBracket` takes the stage to
+  stamp on the next round, so a bracket mode never has to remap mid-flight.
 - All audio (`engine/audio.js`) and all timer logic (`engine/useTimers.js`) —
   timers are per match, not per mode.
 - `MatchCard`, `MatchTimer`, `GoalPanel`, `StandingsTable`, `SectionLabel`,
@@ -153,5 +159,9 @@ redefining them:
   — every mode gets both, unconditionally, from the shell.
 
 Fixture generators and transition logic that only one mode uses
-(`generateKnockoutRound1`, `generateFinalMatches`, `makeKingMatch`,
-`computeKingStreaks`) live inside that mode's own file.
+(`generateFinalMatches`, `makeKingMatch`, `computeKingStreaks`,
+`computeGoalTotals`, the `chaos` twist deck) live inside that mode's own
+file — until a second mode needs them, at which point they move to
+`engine/` rather than being imported across modes. `engine/bracket.js` is
+exactly that move: it was `knockout`'s private code until `penalties`
+needed the same bracket.
