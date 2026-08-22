@@ -2,15 +2,14 @@
  * localStorage is always the write-through cache — every write lands here
  * synchronously first, so the app works with zero network (the actual use
  * case: a phone in a garden with poor signal) and works identically whether
- * or not a backend is configured at all (TASK-DATABASE.md's DB is optional;
- * see src/lib/syncEngine.js).
+ * or not a backend is configured at all (the DB is optional; see
+ * src/lib/syncEngine.js).
  *
  * When a backend *is* configured and the user is signed in, `set`/`delete`
  * on the current-tournament key also fire a background sync via syncEngine.
  * History is intentionally NOT special-cased here — its finer-grained sync
  * (append/delete-by-id rather than whole-array replace) is called directly
- * from the three history call sites in src/engine/useTournament.js, per
- * TASK-DATABASE.md §7.1.
+ * from the three history call sites in src/engine/useTournament.js.
  */
 import { setCurrent as syncSetCurrent, deleteCurrent as syncDeleteCurrent } from "./syncEngine.js";
 

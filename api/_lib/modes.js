@@ -1,9 +1,9 @@
 /* ---------- mode/stage allow-list ----------
  * The server can't import src/modes/index.js (that's client JSX), so this
  * table is a hand-kept mirror of it. Update it here whenever a mode is
- * added there — see TASK-DATABASE.md §4 point 3 for why this is a plain
- * allow-list rather than a SQL ENUM: a new mode should never need a schema
- * migration.
+ * added there. It's a plain allow-list rather than a SQL ENUM deliberately:
+ * a new mode should never need a schema migration — see the `mode`/`stage`
+ * column comments in migrations/001_init.sql.
  */
 export const MODE_STAGES = {
   league: ["group", "final"],

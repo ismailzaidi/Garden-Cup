@@ -1,7 +1,6 @@
 /* ---------- first-login cloud reconciliation ----------
- * TASK-DATABASE.md §7.4: once signed in, compare what the server has for
- * this account against what's already sitting in this browser's
- * localStorage.
+ * Once signed in, compare what the server has for this account against
+ * what's already sitting in this browser's localStorage.
  *   - server has data  -> it's the source of truth (a previous session
  *     already synced it); adopt it into the cache and the running UI.
  *   - server is empty, local has data -> this is "existing device data";

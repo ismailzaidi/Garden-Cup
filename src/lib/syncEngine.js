@@ -1,8 +1,8 @@
 /* ---------- offline-first sync engine ----------
- * Pushes the write-through localStorage cache (src/lib/storage.js) up to the
- * API under api/ (TASK-DATABASE.md §5/§7.2). A complete no-op whenever
- * there's no API configured (local-only mode) or no active session (logged
- * out) — every exported function is safe to call unconditionally.
+ * Pushes the write-through localStorage cache (src/lib/storage.js) up to
+ * the API under api/. A complete no-op whenever there's no API configured
+ * (local-only mode) or no active session (logged out) — every exported
+ * function is safe to call unconditionally.
  *
  * Auth rides on the same-origin session cookie (see apiClient.js) — nothing
  * here handles a token directly.

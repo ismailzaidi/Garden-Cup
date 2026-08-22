@@ -1,7 +1,7 @@
 /* ---------- state <-> rows ----------
  * Decomposes the JSON blob the client PUTs (src/engine/useTournament.js's
  * saved shape) into normalised rows, and recomposes it on GET. Two traps
- * from TASK-DATABASE.md §5 that a change here can silently break:
+ * that a change here can silently break:
  *   1. s1/s2 must come back as STRINGS — the client does
  *      String(Number(m[side]) + 1) and renders it directly.
  *   2. Array order is data — goals[] drives undo, matches[] drives fixture

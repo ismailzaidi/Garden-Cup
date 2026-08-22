@@ -52,6 +52,7 @@ no bearer token in the client at all — same-origin `fetch` sends the cookie
 automatically, which is also why this only works when the SPA and the API
 are the same Vercel deployment.
 
-See `TASK-DATABASE.md` §5 for the full endpoint table and the two
-serialisation traps (`s1`/`s2` as strings, array order as data) that
-`api/_lib/serializer.js` exists to get right.
+The routes under `api/auth/`, `api/tournaments/`, and `api/history/` are the
+source of truth for the exact endpoint list. The two serialisation traps
+(`s1`/`s2` as strings, array order as data) that `api/_lib/serializer.js`
+exists to get right are documented at the top of that file.

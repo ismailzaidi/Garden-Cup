@@ -38,4 +38,4 @@ so the ledger stays accurate.
 
 | File | What it does |
 |---|---|
-| `001_init.sql` | Full initial schema: users, sessions, tournaments, players, matches, goals, mode_queue, tournament_history. See `TASK-DATABASE.md` §4 for the reasoning behind the shape (why `mode`/`stage` are `VARCHAR` and not `ENUM`, why IDs are opaque 26-char strings, etc.). |
+| `001_init.sql` | Full initial schema: users, sessions, tournaments, players, matches, goals, mode_queue, tournament_history. The reasoning behind the shape lives inline — the `not an ENUM` comments on every `mode`/`stage` column, and `api/_lib/id.js` for why primary keys are opaque 26-character strings rather than auto-increment integers. |

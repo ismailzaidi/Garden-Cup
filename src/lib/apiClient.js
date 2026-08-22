@@ -1,6 +1,6 @@
 /* ---------- API client ----------
- * Thin fetch wrapper for the Vercel functions under api/ (TASK-DATABASE.md
- * §5's endpoint table, same contract regardless of what runs behind it).
+ * Thin fetch wrapper for the Vercel functions under api/ — same request/
+ * response contract regardless of what runs behind it (see api/README.md).
  * VITE_API_BASE_URL unset/empty means "no backend configured" — the app
  * runs in local-only mode and nothing in this module is ever called.
  *
