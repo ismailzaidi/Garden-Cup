@@ -15,6 +15,7 @@ export const MODE_STAGES = {
   goldenboot: ["goldenboot"],
   survivor: ["survivor"],
   penalties: ["pens"],
+  worldcup: ["wcgroup", "wcko"],
 };
 
 export function isValidMode(mode) {

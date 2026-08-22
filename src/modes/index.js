@@ -7,6 +7,7 @@ import chaos from "./chaos.jsx";
 import goldenboot from "./goldenboot.jsx";
 import survivor from "./survivor.jsx";
 import penalties from "./penalties.jsx";
+import worldcup from "./worldcup.jsx";
 
-export const MODES = [league, knockout, king, roundrobin, bestofn, chaos, goldenboot, survivor, penalties];
+export const MODES = [league, knockout, king, roundrobin, bestofn, chaos, goldenboot, survivor, penalties, worldcup];
 export const getMode = (key) => MODES.find((m) => m.key === key) ?? MODES[0];
