@@ -152,6 +152,41 @@ describe("Pure League — full playthrough", () => {
   });
 });
 
+describe("Best of N — full playthrough (the phase-8 proof mode)", () => {
+  it("caps the roster at maxPlayers and crowns a champion once every leg is played", async () => {
+    render(<App />);
+    clickText("Best of N");
+    addPlayer("Alice");
+    addPlayer("Bob");
+    addPlayer("Cara"); // should be silently rejected — mode caps at 2
+
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+    expect(screen.queryByText("Cara")).not.toBeInTheDocument();
+    expect(screen.getByText("This mode needs exactly 2 players.")).toBeInTheDocument();
+
+    clickText("3"); // number of legs
+    clickText("GENERATE LEGS");
+
+    await screen.findByText(/Legs/);
+    let addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(6); // 3 legs x 2 sides
+    // make the home side win all three legs it appears in isn't guaranteed
+    // (randomOrder can flip sides per leg) — instead score every match's
+    // p1 twice, which strictly must beat an unscored p2 regardless of who's home.
+    [0, 2, 4].forEach((i) => {
+      fireEvent.click(addGoalButtons[i]);
+      fireEvent.click(addGoalButtons[i]);
+    });
+    screen.getAllByText("Mark played").forEach((btn) => fireEvent.click(btn));
+
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+
+    clickText(/History/);
+    expect(await screen.findAllByText("Best of N")).toHaveLength(2);
+  });
+});
+
 describe("config persists across mode switches", () => {
   it("keeps legCount selected after switching away and back, matching pre-refactor behaviour", () => {
     render(<App />);
