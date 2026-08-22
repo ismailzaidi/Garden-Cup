@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { migrateState } from "./persistence.js";
+import { migrateState } from "../src/engine/persistence.js";
 
 describe("migrateState", () => {
   it("passes through a v2 blob unchanged", () => {

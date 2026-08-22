@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import bestofn from "./bestofn.jsx";
+import bestofn from "../src/modes/bestofn.jsx";
 
 const players = [{ id: "a", name: "Alice" }, { id: "b", name: "Bob" }];
 const leg = (n, s1, s2, played = true) => ({ id: `m${n}`, stage: "bestofn", leg: n, p1: "a", p2: "b", s1: String(s1), s2: String(s2), played });

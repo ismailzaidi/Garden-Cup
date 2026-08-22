@@ -69,7 +69,10 @@ function StandingsView({ matches, standings, actions }) {
 function FinalView({ players, matches, nameOf, champion, timerControls, actions }) {
   const finalMatches = finalMatchesOf(matches);
   const finalPlayedCount = finalMatches.filter((m) => m.played).length;
-  const finalists = finalMatches.length ? players.filter((p) => p.id === finalMatches[0].p1 || p.id === finalMatches[0].p2) : [];
+  const finalists = useMemo(
+    () => (finalMatches.length ? players.filter((p) => p.id === finalMatches[0].p1 || p.id === finalMatches[0].p2) : []),
+    [players, finalMatches]
+  );
   const finalStandings = useMemo(() => computeStandings(finalists, finalMatches), [finalists, finalMatches]);
 
   return (

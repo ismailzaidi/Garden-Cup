@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeKingStreaks } from "./king.jsx";
+import { computeKingStreaks } from "../src/modes/king.jsx";
 
 const m = (seq, p1, p2, s1, s2, played = true) => ({ id: `m${seq}`, stage: "king", seq, p1, p2, s1: String(s1), s2: String(s2), played });
 

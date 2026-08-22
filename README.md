@@ -1,8 +1,12 @@
 # Garden Cup
 
-A 1v1 football tournament tracker for garden matches. Four game modes, per-match
-timers with audio warnings, goal-minute logging, top-scorer stats, and persistent
-history saved to the device.
+[![CI](https://github.com/ismailzaidi/Garden-Cup/actions/workflows/ci.yml/badge.svg)](https://github.com/ismailzaidi/Garden-Cup/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+A 1v1 football tournament tracker for garden matches. Five game modes, per-match
+timers with audio warnings, goal-minute logging, top-scorer stats, and
+persistent history — installable as a home-screen app and built to keep
+working on a phone with a weak signal.
 
 ## Modes
 
@@ -10,6 +14,37 @@ history saved to the device.
 - **Pure League** — round robin, top of the table wins
 - **Knockout** — randomised single-elimination bracket with automatic byes
 - **Winner Stays On** — king defends the pitch, challengers queue up
+- **Best of N** — two players, a fixed number of legs (3, 5, or 7), most points wins
+
+New modes are a self-contained file plus one registry line — see
+[`docs/ADDING-A-MODE.md`](docs/ADDING-A-MODE.md) and the contract it
+implements, [`src/modes/contract.md`](src/modes/contract.md).
+
+## Architecture
+
+```
+  Browser (phone/tablet) ── static assets + same-origin fetch ──▶ Vercel
+                                                                     │
+                                    Vite/React SPA  +  api/*  (Node.js serverless)
+                                                                     │
+                                                          TCP, TLS, mariadb driver
+                                                                     ▼
+                                                          MariaDB (optional)
+```
+
+The frontend and API are one Vercel deployment — no separate host, no CORS,
+no cross-origin auth token. A database is entirely optional (see
+**Data & persistence** below); without one, this is a static SPA with zero
+backend at all.
+
+| Layer | Tech |
+|---|---|
+| UI | React 18, Vite 5, Tailwind CSS |
+| State/persistence engine | Plain hooks (`src/engine/`) — no external state library |
+| API | Node.js serverless functions (`api/`), no framework |
+| Database | MariaDB, plain parameterised SQL, no ORM |
+| Auth | httpOnly session cookie, scrypt password hashing — no auth library |
+| Tests | Vitest + Testing Library |
 
 ## Run locally
 
@@ -18,43 +53,72 @@ npm install
 npm run dev
 ```
 
-Opens at http://localhost:5173
+Opens at http://localhost:5173 in local-only mode (see below) — no database
+or environment variables required.
 
-## Deploy to GitHub Pages
+## Testing & linting
 
-1. Create a repo on GitHub and push this project to the `main` branch.
-2. In the repo, go to **Settings → Pages** and set **Source** to **GitHub Actions**.
-3. Push to `main`. The workflow in `.github/workflows/deploy.yml` builds and
-   deploys automatically.
-4. The site appears at `https://<your-username>.github.io/<repo-name>/`
+Tests live in [`tests/`](tests/), one folder, separate from the source
+they exercise — not scattered as `*.test.js` files next to their subjects.
 
-The workflow sets Vite's `base` path from the repo name automatically, so assets
-resolve correctly on project Pages.
+```bash
+npm run lint    # ESLint
+npm run test    # Vitest, once
+npm run test:watch
+npm run build   # production build
+```
+
+All four run in CI on every push and pull request
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Tests cover the
+tournament engine (standings, fixture generation, undo), every game mode's
+fixture/advancement logic, the v1→v2 save-state migration, the client/server
+mode registry staying in sync, and a full playthrough of the app through
+Testing Library.
 
 ## Data & persistence
 
-All data (current tournament, scores, goals, completed history) is stored in the
-browser's `localStorage` under the keys `gardenCup:current` and
-`gardenCup:history`. No backend or database required.
+A database is optional. Every state change writes to the browser's
+`localStorage` first (keys `gardenCup:current` and `gardenCup:history`) — that
+write is synchronous and never depends on a network call, so the app works
+fully offline and requires nothing else to run at all.
 
-**This means data is per-device and per-browser.** History on your phone won't
-appear on a tablet. If you later want cross-device sync, swap the `storage`
-object at the top of `src/App.jsx` for a Supabase (or similar) client — the rest
-of the app talks to that interface only.
+**Local-only mode (default):** if `VITE_API_BASE_URL` isn't set, that's the
+whole story — no accounts, no server, data lives only on this device. Use the
+export/import buttons (top of the app) to move data to another device or keep
+a manual backup: export downloads a JSON file of the current tournament and
+full history; import restores from one. Nothing is ever deleted silently by
+either action.
 
-Clearing browser data for the site will erase saved tournaments.
+**Cloud sync (optional):** set `VITE_API_BASE_URL=/api` and deploy the
+serverless functions under `api/` (see [`api/README.md`](api/README.md)) to
+add accounts and cross-device sync against a MariaDB database.
+`localStorage` stays the write-through cache either way — sign-in adds a
+background sync on top of it, it doesn't replace it. A phone that loses
+signal mid-tournament keeps working normally; goals sync once the connection
+comes back. On first sign-in on a new device, existing local data is never
+imported automatically — you're asked first.
+
+Clearing browser data (or never configuring an API at all) erases anything
+that hasn't been exported or synced.
+
+## Deployment
+
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the full runbook — Vercel project
+setup, environment variables, applying the database schema, rollback, and
+custom domains.
 
 ## Add to home screen
 
-The app ships a web manifest, so on iOS (Share → Add to Home Screen) or Android
-(menu → Install app) it launches fullscreen like a native app and works offline
-after first load.
-
-Replace `public/icon-192.png` and `public/icon-512.png` with your own artwork if
-you want a nicer icon.
+The app ships a web manifest, so on iOS (Share → Add to Home Screen) or
+Android (menu → Install app) it launches fullscreen like a native app and
+works offline after first load.
 
 ## Audio note
 
 Browsers block sound until the user interacts with the page. The app unlocks
 audio on the first tap, so tap anything once before relying on the 10-second
 warning beep.
+
+## License
+
+[MIT](LICENSE)

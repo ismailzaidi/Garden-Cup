@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchWinner, generateGroupMatches, makeId, roundLabel } from "./match.js";
+import { matchWinner, generateGroupMatches, makeId, roundLabel } from "../src/engine/match.js";
 
 // Deterministic PRNG for reproducible fixture-generation tests.
 function seededRng(seed) {

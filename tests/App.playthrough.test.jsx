@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
-import App from "./App.jsx";
+import App from "../src/App.jsx";
 
 // No real browser is available in this environment, so these drive the app
 // the same way a manual click-through would: through rendered text and

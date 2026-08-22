@@ -5,6 +5,7 @@ import { migrateState } from "./persistence.js";
 import { playGoalChime } from "./audio.js";
 import { useTimers } from "./useTimers.js";
 import { storage } from "../lib/storage.js";
+import { addHistory, deleteHistory, clearHistory as syncClearHistory, REMOTE_UPDATE_EVENT } from "../lib/syncEngine.js";
 import { MODES, getMode } from "../modes/index.js";
 
 const CURRENT_KEY = "gardenCup:current";
@@ -35,30 +36,48 @@ export function useTournament() {
 
   const activeMode = getMode(mode);
 
+  /* apply a loaded/migrated current-tournament object to state — shared by
+     the mount load below and by a remote update (a 409 conflict resolution,
+     or the initial cloud reconciliation in App.jsx both dispatch
+     REMOTE_UPDATE_EVENT rather than duplicate this) */
+  const applyCurrentState = (raw) => {
+    const d = migrateState(raw);
+    if (!d) return;
+    setPlayers(d.players || []);
+    setMatches(d.matches || []);
+    setGoals(d.goals || []);
+    setMode(d.mode || "league");
+    setConfigState((prev) => ({ ...prev, ...(d.config || {}) }));
+    setModeState(d.modeState || {});
+    setTournamentId(d.tournamentId || makeId());
+    setHistorySaved(!!d.historySaved);
+  };
+
   /* load saved state */
   useEffect(() => {
     (async () => {
       try {
         const res = await storage.get(CURRENT_KEY);
-        if (res && res.value) {
-          const d = migrateState(JSON.parse(res.value));
-          setPlayers(d.players || []);
-          setMatches(d.matches || []);
-          setGoals(d.goals || []);
-          setMode(d.mode || "league");
-          setConfigState((prev) => ({ ...prev, ...(d.config || {}) }));
-          setModeState(d.modeState || {});
-          setTournamentId(d.tournamentId || makeId());
-          setHistorySaved(!!d.historySaved);
-        }
-      } catch (e) { /* nothing saved */ }
+        if (res && res.value) applyCurrentState(JSON.parse(res.value));
+      } catch { /* nothing saved */ }
       try {
         const r = await storage.get(HISTORY_KEY);
         if (r && r.value) setHistory(JSON.parse(r.value));
-      } catch (e) { /* no history */ }
+      } catch { /* no history */ }
       setLoaded(true);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* pick up a state pushed in from outside the normal load path — a 409
+     conflict resolution, or the initial cloud reconciliation after login
+     (see src/lib/syncEngine.js and src/App.jsx) */
+  useEffect(() => {
+    const onRemoteUpdate = (e) => {
+      if (e.detail?.current !== undefined) applyCurrentState(e.detail.current);
+      if (e.detail?.history !== undefined) setHistory(e.detail.history);
+    };
+    window.addEventListener(REMOTE_UPDATE_EVENT, onRemoteUpdate);
+    return () => window.removeEventListener(REMOTE_UPDATE_EVENT, onRemoteUpdate);
   }, []);
 
   /* persist */
@@ -69,7 +88,7 @@ export function useTournament() {
       storage.set(CURRENT_KEY, JSON.stringify({
         players, matches, goals, mode, config, modeState, tournamentId, historySaved, schemaVersion: 2,
       })).catch(() => {});
-    }, 500);
+    }, 1500);
     return () => clearTimeout(saveTimeoutRef.current);
   }, [players, matches, goals, mode, config, modeState, tournamentId, historySaved, loaded]);
 
@@ -178,19 +197,24 @@ export function useTournament() {
       storage.set(HISTORY_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
+    addHistory(record);
     setHistorySaved(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [champion?.id, loaded, historySaved, mode, tournamentId]);
 
-  const deleteHistoryEntry = (id) => setHistory((prev) => {
-    const next = prev.filter((h) => h.id !== id);
-    storage.set(HISTORY_KEY, JSON.stringify(next)).catch(() => {});
-    return next;
-  });
+  const deleteHistoryEntry = (id) => {
+    setHistory((prev) => {
+      const next = prev.filter((h) => h.id !== id);
+      storage.set(HISTORY_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+    deleteHistory(id);
+  };
 
   const clearHistory = () => {
     setHistory([]);
     storage.delete(HISTORY_KEY).catch(() => {});
+    syncClearHistory();
   };
 
   return {

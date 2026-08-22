@@ -5,7 +5,7 @@ const DEFAULT_DURATION = 180;
 
 export function useTimers() {
   const [timers, setTimers] = useState({});
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const beepedRef = useRef({});
   const warnedRef = useRef({});
 

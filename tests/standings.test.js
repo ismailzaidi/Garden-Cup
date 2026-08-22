@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStandings, computeTopScorers, computeMinuteBuckets } from "./standings.js";
+import { computeStandings, computeTopScorers, computeMinuteBuckets } from "../src/engine/standings.js";
 
 const p = (id, name) => ({ id, name });
 const played = (p1, p2, s1, s2, extra = {}) => ({ id: `${p1}-${p2}`, stage: "group", p1, p2, s1: String(s1), s2: String(s2), played: true, ...extra });
