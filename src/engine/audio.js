@@ -38,10 +38,13 @@ export function playBeep() {
   } catch { /* no audio */ }
 }
 
-export function playWarningBeep() {
+export function playCountdownRing() {
   try {
     unlockAudio();
-    tone(1318, "sine", 0, 0.15, 0.12);
+    [0, 0.5, 1.0].forEach((start) => {
+      tone(1200, "square", start, 0.18, 0.25);
+      tone(1500, "square", start + 0.22, 0.18, 0.25);
+    });
   } catch { /* no audio */ }
 }
 

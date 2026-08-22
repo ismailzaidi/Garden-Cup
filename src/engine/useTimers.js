@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { unlockAudio, playBeep, playWarningBeep } from "./audio.js";
+import { unlockAudio, playBeep, playCountdownRing } from "./audio.js";
 
 const DEFAULT_DURATION = 180;
 
@@ -25,7 +25,7 @@ export function useTimers() {
             if (!beepedRef.current[id]) { beepedRef.current[id] = true; playBeep(); }
           } else if (remaining <= 10 && !warnedRef.current[id]) {
             warnedRef.current[id] = true;
-            playWarningBeep();
+            playCountdownRing();
           }
         });
         return changed ? next : prev;
