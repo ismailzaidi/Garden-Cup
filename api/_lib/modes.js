@@ -12,6 +12,7 @@ export const MODE_STAGES = {
   roundrobin: ["group"],
   bestofn: ["bestofn"],
   chaos: ["chaos"],
+  goldenboot: ["goldenboot"],
 };
 
 export function isValidMode(mode) {
