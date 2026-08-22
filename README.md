@@ -3,7 +3,7 @@
 [![CI](https://github.com/ismailzaidi/Garden-Cup/actions/workflows/ci.yml/badge.svg)](https://github.com/ismailzaidi/Garden-Cup/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A 1v1 football tournament tracker for garden matches. Five game modes, per-match
+A 1v1 football tournament tracker for garden matches. Ten game modes, per-match
 timers with audio warnings, goal-minute logging, top-scorer stats, and
 persistent history — installable as a home-screen app and built to keep
 working on a phone with a weak signal.
@@ -15,6 +15,11 @@ working on a phone with a weak signal.
 - **Knockout** — randomised single-elimination bracket with automatic byes
 - **Winner Stays On** — king defends the pitch, challengers queue up
 - **Best of N** — two players, a fixed number of legs (3, 5, or 7), most points wins
+- **Garden World Cup** — two groups, then semi-finals, a third-place playoff, and the final
+- **Golden Boot Race** — first player to score N goals in total takes the boot
+- **Last One Standing** — everyone plays everyone, bottom of the table goes out each round
+- **Penalty Shootout Cup** — a knockout bracket decided entirely on penalties
+- **Chaos Cup** — round robin where every match is dealt a random silly rule
 
 New modes are a self-contained file plus one registry line — see
 [`docs/ADDING-A-MODE.md`](docs/ADDING-A-MODE.md) and the contract it

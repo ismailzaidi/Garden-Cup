@@ -187,6 +187,167 @@ describe("Best of N — full playthrough (the phase-8 proof mode)", () => {
   });
 });
 
+describe("Chaos Cup — full playthrough", () => {
+  it("deals a twist to the fixture and crowns the table leader", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("Chaos Cup");
+    clickText("1"); // times each pair plays
+    clickText("DEAL THE CHAOS");
+
+    await screen.findByText(/Chaos ·/);
+    // the twist banner is dealt per match, so exactly one of the deck's
+    // labels must be on screen alongside the match card
+    const addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(2);
+    fireEvent.click(addGoalButtons[0]);
+    fireEvent.click(addGoalButtons[0]);
+    clickText("Mark played");
+
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+    expect(screen.getByText("Survived the chaos")).toBeInTheDocument();
+
+    clickText(/History/);
+    expect(await screen.findAllByText("Chaos Cup")).toHaveLength(2);
+  });
+});
+
+describe("Golden Boot Race — full playthrough", () => {
+  it("crowns the first player to reach the goal target", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("Golden Boot Race");
+    clickText("5"); // goals to win the Golden Boot
+    clickText("START THE RACE");
+
+    await screen.findByText(/Race ·/);
+    const addGoalButtons = screen.getAllByLabelText("Add goal");
+    for (let i = 0; i < 5; i++) fireEvent.click(addGoalButtons[0]);
+    // totals only count played matches, so the race isn't won until the
+    // match is confirmed
+    expect(screen.queryByText("Champion")).not.toBeInTheDocument();
+    clickText("Mark played");
+
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+    expect(screen.getByText("Golden Boot winner — first to 5")).toBeInTheDocument();
+
+    clickText(/History/);
+    expect(await screen.findAllByText("Golden Boot Race")).toHaveLength(2);
+  });
+});
+
+describe("Last One Standing — full playthrough", () => {
+  it("knocks out the bottom player each round until one is left", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    addPlayer("Cara");
+    clickText("Last One Standing");
+    clickText("START ROUND 1");
+
+    // round 1: three players, three fixtures — score every match's p1 so
+    // the round has a definite bottom regardless of which side is home
+    await screen.findByText(/Arena · R1/);
+    let addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(6);
+    [0, 2, 4].forEach((i) => fireEvent.click(addGoalButtons[i]));
+    screen.getAllByText("Mark played").forEach((btn) => fireEvent.click(btn));
+
+    clickText("KNOCK OUT THE LAST PLACE");
+
+    // round 2: only the two survivors, so only their fixture is on screen
+    await screen.findByText(/Arena · R2/);
+    addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(2);
+    fireEvent.click(addGoalButtons[0]);
+    clickText("Mark played");
+    clickText("KNOCK OUT THE LAST PLACE");
+
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+    expect(screen.getByText("Last one standing")).toBeInTheDocument();
+
+    clickText(/History/);
+    expect(await screen.findAllByText("Last One Standing")).toHaveLength(2);
+  });
+});
+
+describe("Penalty Shootout Cup — full playthrough", () => {
+  it("plays a four-player shootout bracket through to a champion", async () => {
+    render(<App />);
+    ["Alice", "Bob", "Cara", "Dee"].forEach(addPlayer);
+    clickText("Penalty Shootout Cup");
+    clickText("5"); // penalties per player
+    clickText("GENERATE THE SHOOTOUTS");
+
+    await screen.findByText(/Shootout ·/);
+    let addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(4);
+    fireEvent.click(addGoalButtons[0]);
+    fireEvent.click(addGoalButtons[2]);
+    screen.getAllByText("Mark played").forEach((btn) => fireEvent.click(btn));
+
+    clickText("NEXT ROUND OF SHOOTOUTS");
+
+    // round-1 cards keep their controls, so the final's pair is the last two
+    addGoalButtons = await screen.findAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(6);
+    fireEvent.click(addGoalButtons[4]);
+    screen.getAllByText("Mark played").slice(-1).forEach((btn) => fireEvent.click(btn));
+
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+    expect(screen.getByText("Ice in the veins — shootout champion")).toBeInTheDocument();
+
+    clickText(/History/);
+    expect(await screen.findAllByText("Penalty Shootout Cup")).toHaveLength(2);
+  });
+});
+
+describe("Garden World Cup — full playthrough", () => {
+  it("plays the group stage, the semis, and the final, and awards a bronze", async () => {
+    render(<App />);
+    ["Alice", "Bob", "Cara", "Dee"].forEach(addPlayer);
+    clickText("Garden World Cup");
+    clickText("1"); // group games between each pair
+    clickText("KICK OFF THE GROUP STAGE");
+
+    // two groups of two, so one fixture each
+    await screen.findByText(/Groups ·/);
+    let addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(4);
+    fireEvent.click(addGoalButtons[0]);
+    fireEvent.click(addGoalButtons[2]);
+    screen.getAllByText("Mark played").forEach((btn) => fireEvent.click(btn));
+
+    clickText("KICK OFF THE SEMI-FINALS");
+
+    // advancing switches to the Finals tab, which shows only the two semis
+    await screen.findByText("SEMI-FINALS");
+    addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(4);
+    fireEvent.click(addGoalButtons[0]);
+    fireEvent.click(addGoalButtons[2]);
+    screen.getAllByText("Mark played").forEach((btn) => fireEvent.click(btn));
+
+    clickText("SET UP THE FINAL");
+
+    // now four cards: two semis, the third-place playoff, then the final
+    await screen.findByText("THE FINAL");
+    expect(screen.getByText("THIRD PLACE")).toBeInTheDocument();
+    addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(8);
+    fireEvent.click(addGoalButtons[6]); // the final's p1
+    screen.getAllByText("Mark played").slice(-1).forEach((btn) => fireEvent.click(btn));
+
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+    expect(screen.getByText("Garden World Cup winner")).toBeInTheDocument();
+
+    clickText(/History/);
+    expect(await screen.findAllByText("Garden World Cup")).toHaveLength(2);
+  });
+});
+
 describe("config persists across mode switches", () => {
   it("keeps legCount selected after switching away and back, matching pre-refactor behaviour", () => {
     render(<App />);
