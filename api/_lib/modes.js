@@ -13,6 +13,7 @@ export const MODE_STAGES = {
   bestofn: ["bestofn"],
   chaos: ["chaos"],
   goldenboot: ["goldenboot"],
+  survivor: ["survivor"],
 };
 
 export function isValidMode(mode) {
