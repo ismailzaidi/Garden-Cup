@@ -1,30 +1,34 @@
 import { useMemo } from "react";
-import { ListOrdered, Award } from "lucide-react";
+import { Zap, Dices } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { makeId, alternateHome, generateGroupMatches } from "../engine/match.js";
+import { dealTwists, twistOf } from "../engine/twists.js";
 import { computeStandings } from "../engine/standings.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
 import MatchCard from "../components/MatchCard.jsx";
 import EmptyCard from "../components/EmptyCard.jsx";
 import FixturesList from "../components/FixturesList.jsx";
+import TwistBanner from "../components/TwistBanner.jsx";
 
 const DEFAULT_LEGS = 3;
 
-const groupMatchesOf = (matches) => matches.filter((m) => m.stage === "group");
-const finalMatchesOf = (matches) => matches.filter((m) => m.stage === "final");
+const groupMatchesOf = (matches) => matches.filter((m) => m.stage === "lcgroup");
+const finalMatchesOf = (matches) => matches.filter((m) => m.stage === "lcfinal");
 
+/* The group stage is played straight — reaching the final is what earns you
+   the silly rules, so the twists are dealt here and nowhere else. */
 function generateFinalMatches(p1, p2, legCount, rng = Math.random) {
+  const twists = dealTwists(legCount, rng);
   return alternateHome(p1, p2, legCount, rng).map(([a, b], i) => (
-    { id: makeId(), stage: "final", leg: i + 1, p1: a.id, p2: b.id, s1: "0", s2: "0", played: false }
+    { id: makeId(), stage: "lcfinal", leg: i + 1, p1: a.id, p2: b.id, s1: "0", s2: "0", played: false, twist: twists[i] }
   ));
 }
 
 function champion({ players, matches }) {
   const finalMatches = finalMatchesOf(matches);
   if (finalMatches.length === 0) return null;
-  const finalPlayedCount = finalMatches.filter((m) => m.played).length;
-  if (finalPlayedCount !== finalMatches.length) return null;
+  if (finalMatches.some((m) => !m.played)) return null;
   const finalists = players.filter((p) => p.id === finalMatches[0].p1 || p.id === finalMatches[0].p2);
   const finalStandings = computeStandings(finalists, finalMatches);
   if (finalStandings.length !== 2) return null;
@@ -36,7 +40,7 @@ export function advance({ players, matches, config, rng = Math.random }) {
   if (standings.length < 2) return { matches, modeState: {}, tab: "standings" };
   const legCount = config.legCount ?? DEFAULT_LEGS;
   const final = generateFinalMatches(standings[0], standings[1], legCount, rng);
-  return { matches: [...matches.filter((m) => m.stage !== "final"), ...final], modeState: {}, tab: "final" };
+  return { matches: [...matches.filter((m) => m.stage !== "lcfinal"), ...final], modeState: {}, tab: "final" };
 }
 
 function FixturesView({ matches, config, nameOf, timerControls, actions }) {
@@ -53,7 +57,7 @@ function StandingsView({ matches, standings, actions }) {
       {standings.length >= 2 && (
         <button onClick={actions.advance} className="w-full py-3.5 rounded-xl font-bold text-sm tracking-wide active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
           style={{ backgroundColor: C.pitch, color: "#F7F5EE" }}>
-          <Award size={16} /> {finalExists ? "REGENERATE FINAL" : "SET UP FINAL (TOP 2)"}
+          <Dices size={16} /> {finalExists ? "REDEAL CHAOS FINAL" : "SET UP CHAOS FINAL (TOP 2)"}
         </button>
       )}
       {playedCount < gm.length && (
@@ -76,16 +80,19 @@ function FinalView({ players, matches, nameOf, champion, timerControls, actions 
 
   return (
     <>
-      {champion && <ChampionBanner name={champion.name} subtitle={`Won the final ${champion.pts}–${finalStandings[1].pts} on points`} />}
-      {finalMatches.length === 0 && <EmptyCard>No final set up yet — head to the Table tab and tap "Set up final".</EmptyCard>}
+      {champion && <ChampionBanner name={champion.name} subtitle={`Won the chaos final ${champion.pts}–${finalStandings[1].pts} on points`} />}
+      {finalMatches.length === 0 && <EmptyCard>No final set up yet — head to the Table tab and deal the chaos final.</EmptyCard>}
       {finalMatches.length > 0 && finalPlayedCount === finalMatches.length && !champion && finalStandings.length === 2 && (
         <div className="rounded-2xl p-4 text-sm text-center" style={{ backgroundColor: "#fff", border: `2px solid ${C.line}`, color: C.sub }}>
-          Final is level on points — play a decider to crown a champion.
+          Final is level on points — redeal the chaos final to settle it.
         </div>
       )}
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         {finalMatches.map((m) => (
-          <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
+          <div key={m.id}>
+            <TwistBanner twist={twistOf(m.twist)} />
+            <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
+          </div>
         ))}
       </div>
       {finalists.length === 2 && <StandingsTable standings={finalStandings} />}
@@ -94,12 +101,12 @@ function FinalView({ players, matches, nameOf, champion, timerControls, actions 
 }
 
 export default {
-  key: "league",
-  label: "League + Final",
-  desc: "Round robin, top 2 play off",
-  icon: ListOrdered,
+  key: "leaguechaos",
+  label: "League + Chaos",
+  desc: "Round robin, top 2 meet in a chaos final",
+  icon: Zap,
   minPlayers: 2,
-  stages: ["group", "final"],
+  stages: ["lcgroup", "lcfinal"],
   config: {
     legCount: { type: "choice", label: "Legs per pairing", options: [1, 2, 3, 4], default: DEFAULT_LEGS },
   },
@@ -108,17 +115,18 @@ export default {
     const matchCount = (players.length * (players.length - 1) * legCount) / 2;
     return (
       <>
-        <b style={{ color: C.ink }}>{matchCount} matches</b> ({players.length} players × {legCount} leg{legCount > 1 ? "s" : ""}), then the top 2 play a final.
+        <b style={{ color: C.ink }}>{matchCount} matches</b> played straight ({players.length} players × {legCount} leg{legCount > 1 ? "s" : ""}),
+        then the top 2 meet in a final where every leg is dealt a random silly rule.
       </>
     );
   },
   generateLabel: "GENERATE FIXTURES",
   subtitle: ({ config }) => {
     const legCount = config.legCount ?? DEFAULT_LEGS;
-    return `${legCount} LEG${legCount > 1 ? "S" : ""} · 3 PTS WIN · TOP 2 REACH THE FINAL`;
+    return `${legCount} LEG${legCount > 1 ? "S" : ""} · 3 PTS WIN · TOP 2 REACH THE CHAOS FINAL`;
   },
   createFixtures: ({ players, config, rng = Math.random }) => ({
-    matches: generateGroupMatches(players, config.legCount ?? DEFAULT_LEGS, rng),
+    matches: generateGroupMatches(players, config.legCount ?? DEFAULT_LEGS, rng).map((m) => ({ ...m, stage: "lcgroup" })),
     modeState: {},
     initialTab: "fixtures",
   }),
@@ -131,7 +139,7 @@ export default {
     return [
       { key: "fixtures", label: matches.length ? `Fixtures · ${playedCount}/${gm.length}` : "Fixtures" },
       { key: "standings", label: "Table" },
-      { key: "final", label: finalMatches.length ? `Final · ${finalPlayedCount}/${config.legCount ?? DEFAULT_LEGS}` : "Final" },
+      { key: "final", label: finalMatches.length ? `Chaos Final · ${finalPlayedCount}/${config.legCount ?? DEFAULT_LEGS}` : "Chaos Final" },
     ];
   },
   advance,

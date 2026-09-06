@@ -38,13 +38,13 @@ export function playBeep() {
   } catch { /* no audio */ }
 }
 
-export function playCountdownRing() {
+/* One tick per second through the final ten. Kept to a single short tone so
+   ten of them in a row read as a countdown rather than as ten alarms, and
+   pitched well above the goal chime so the two are never confused. */
+export function playCountdownTick() {
   try {
     unlockAudio();
-    [0, 0.5, 1.0].forEach((start) => {
-      tone(1200, "square", start, 0.18, 0.25);
-      tone(1500, "square", start + 0.22, 0.18, 0.25);
-    });
+    tone(1200, "square", 0, 0.15, 0.25);
   } catch { /* no audio */ }
 }
 

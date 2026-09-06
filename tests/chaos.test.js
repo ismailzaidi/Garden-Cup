@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import chaos, { TWISTS, dealTwists, twistOf } from "../src/modes/chaos.jsx";
+import chaos from "../src/modes/chaos.jsx";
+import { TWISTS, dealTwists, twistOf } from "../src/engine/twists.js";
 
 function seededRng(seed) {
   let s = seed;

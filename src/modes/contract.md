@@ -142,8 +142,18 @@ redefining them:
 - `matchWinner`, `shuffle`, `randomOrder`, `roundLabel`, `makeId`.
 - `generateGroupMatches` — the round-robin generator used by every mode with
   a round-robin phase (`league`, `roundrobin`, `chaos`, `goldenboot`,
-  `survivor`). It stamps `stage: "group"`; a mode owning a different stage
-  remaps the returned matches rather than changing the generator.
+  `survivor`, `leaguechaos`). It stamps `stage: "group"`; a mode owning a
+  different stage remaps the returned matches rather than changing the
+  generator. It also owns home/away balance: `p1` is the home side, and the
+  generator guarantees every player a fair share of home starts, so a mode
+  must not re-flip the sides it returns.
+- `alternateHome` — the same guarantee for a two-player leg series (a Best of
+  N, a multi-leg final): one flip picks who hosts leg 1, then it alternates.
+  Use it instead of calling `randomOrder` per leg, which can hand one player
+  every away start.
+- `engine/twists.js` — `TWISTS`, `dealTwists`, `twistOf`, the deck of silly
+  real-world rules shared by `chaos` and `leaguechaos`. A twist must never
+  change how a goal counts, or the generic standings stop being valid.
 - `engine/bracket.js` — `generateKnockoutRound1`, `latestRoundState`,
   `bracketChampion`, and `advanceBracket`, the single-elimination machinery
   shared by `knockout` and `penalties`. `advanceBracket` takes the stage to
@@ -151,7 +161,7 @@ redefining them:
 - All audio (`engine/audio.js`) and all timer logic (`engine/useTimers.js`) —
   timers are per match, not per mode.
 - `MatchCard`, `MatchTimer`, `GoalPanel`, `StandingsTable`, `SectionLabel`,
-  `EmptyCard`, `ChampionBanner`, `ProgressBar` — keep them dumb. They decide
+  `EmptyCard`, `ChampionBanner`, `ProgressBar`, `TwistBanner` — keep them dumb. They decide
   nothing about which mode is active; the mode's view passes in the values
   (`needsWinner`, `homeTag`, `awayTag`, `hideToggle`, ...) that make them
   behave correctly for that mode.
@@ -160,8 +170,9 @@ redefining them:
 
 Fixture generators and transition logic that only one mode uses
 (`generateFinalMatches`, `makeKingMatch`, `computeKingStreaks`,
-`computeGoalTotals`, the `chaos` twist deck) live inside that mode's own
-file — until a second mode needs them, at which point they move to
-`engine/` rather than being imported across modes. `engine/bracket.js` is
-exactly that move: it was `knockout`'s private code until `penalties`
-needed the same bracket.
+`computeGoalTotals`) live inside that mode's own file — until a second mode
+needs them, at which point they move to `engine/` (or `components/`) rather
+than being imported across modes. `engine/bracket.js` is exactly that move:
+it was `knockout`'s private code until `penalties` needed the same bracket.
+`engine/twists.js` and `components/TwistBanner.jsx` are the same move again,
+out of `chaos` once `leaguechaos` needed the deck.

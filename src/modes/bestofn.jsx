@@ -1,6 +1,6 @@
 import { Repeat } from "lucide-react";
 import { C } from "../lib/theme.js";
-import { makeId, randomOrder } from "../engine/match.js";
+import { makeId, alternateHome } from "../engine/match.js";
 import { computeStandings } from "../engine/standings.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
@@ -55,10 +55,9 @@ export default {
   subtitle: ({ config }) => `BEST OF ${config.legs ?? DEFAULT_LEGS} · HEAD TO HEAD`,
   createFixtures: ({ players, config, rng = Math.random }) => {
     const legs = config.legs ?? DEFAULT_LEGS;
-    const matches = Array.from({ length: legs }, (_, i) => {
-      const [a, b] = randomOrder(players[0], players[1], rng);
-      return { id: makeId(), stage: "bestofn", leg: i + 1, p1: a.id, p2: b.id, s1: "0", s2: "0", played: false };
-    });
+    const matches = alternateHome(players[0], players[1], legs, rng).map(([a, b], i) => (
+      { id: makeId(), stage: "bestofn", leg: i + 1, p1: a.id, p2: b.id, s1: "0", s2: "0", played: false }
+    ));
     return { matches, modeState: {}, initialTab: "matches" };
   },
   champion,

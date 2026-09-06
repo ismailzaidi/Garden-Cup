@@ -53,7 +53,7 @@ Default-export the contract object. A minimal, single-phase mode (no
 ```jsx
 import { Repeat } from "lucide-react";
 import { C } from "../lib/theme.js";
-import { makeId, randomOrder } from "../engine/match.js";
+import { makeId, alternateHome } from "../engine/match.js";
 import { computeStandings } from "../engine/standings.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
@@ -108,10 +108,9 @@ export default {
   subtitle: ({ config }) => `BEST OF ${config.legs ?? DEFAULT_LEGS} · HEAD TO HEAD`,
   createFixtures: ({ players, config, rng = Math.random }) => {
     const legs = config.legs ?? DEFAULT_LEGS;
-    const matches = Array.from({ length: legs }, (_, i) => {
-      const [a, b] = randomOrder(players[0], players[1], rng);
-      return { id: makeId(), stage: "bestofn", leg: i + 1, p1: a.id, p2: b.id, s1: "0", s2: "0", played: false };
-    });
+    const matches = alternateHome(players[0], players[1], legs, rng).map(([a, b], i) => (
+      { id: makeId(), stage: "bestofn", leg: i + 1, p1: a.id, p2: b.id, s1: "0", s2: "0", played: false }
+    ));
     return { matches, modeState: {}, initialTab: "matches" };
   },
   champion,
@@ -132,9 +131,14 @@ A few things this example leans on that are easy to miss:
   final) computes its *secondary* standings locally, but the primary table is
   always free.
 - **`rng` is threaded, not called directly.** `createFixtures` and `advance`
-  both receive `rng` and default it to `Math.random` — pass it into `shuffle`
-  and `randomOrder` rather than letting them fall back on their own default,
-  so the mode stays seedable in tests.
+  both receive `rng` and default it to `Math.random` — pass it into `shuffle`,
+  `alternateHome`, and `generateGroupMatches` rather than letting them fall
+  back on their own default, so the mode stays seedable in tests.
+- **Home/away is not a per-match coin flip.** `p1` kicks off and wears the
+  HOME tag, so `alternateHome` (two players over several legs) and
+  `generateGroupMatches` (a round robin) each hand out home starts fairly.
+  Calling `randomOrder` per match instead can leave a player away in every
+  fixture they play.
 - **`stage` must be unique.** Pick a string no other mode uses (`"bestofn"`
   here). It's what lets `computeStandings(players, matches-in-stages[0])`
   isolate the right matches, and it's what a future server-side schema
@@ -159,11 +163,18 @@ In `src/modes/index.js`:
 +export const MODES = [league, knockout, king, roundrobin, bestofn];
 ```
 
-That's the whole integration. The setup screen's mode grid, the tab bar, the
-generate button, the config pickers, persistence (including the schema
-migration, since v2 state is already keyed by mode/config/modeState rather
-than a fixed set of fields), the Stats tab, and the History tab all pick the
-new mode up automatically — none of them mention any mode by name.
+Then add the same key and its stages to `MODE_STAGES` in `api/_lib/modes.js`.
+The server can't import this registry (it's client JSX), so it keeps a
+hand-written mirror, and `tests/modeRegistryParity.test.js` is what catches
+you forgetting: without it every save for the new mode 422s, the sync engine
+treats that as non-retryable, and the user just sees a stuck "Sync error"
+pill.
+
+Those two files are the whole integration. The setup screen's mode grid, the
+tab bar, the generate button, the config pickers, persistence (including the
+schema migration, since v2 state is already keyed by mode/config/modeState
+rather than a fixed set of fields), the Stats tab, and the History tab all
+pick the new mode up automatically — none of them mention any mode by name.
 
 ## 5. Verify
 
@@ -176,6 +187,7 @@ new mode up automatically — none of them mention any mode by name.
   generate, play every match, confirm the champion banner and the History
   entry both appear.
 - `git diff --stat` — for a self-contained mode like this one, it should show
-  only the new mode file and the two-line change to `src/modes/index.js`. If
-  it shows anything else, the contract was missing something — fix
-  `contract.md` and the shell code that reads it, not the mode file.
+  only the new mode file, the two-line change to `src/modes/index.js`, and
+  the one-line change to `api/_lib/modes.js`. If it shows anything else, the
+  contract was missing something — fix `contract.md` and the shell code that
+  reads it, not the mode file.

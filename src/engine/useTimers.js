@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { unlockAudio, playBeep, playCountdownRing } from "./audio.js";
+import { unlockAudio, playBeep, playCountdownTick } from "./audio.js";
 
 const DEFAULT_DURATION = 180;
 
@@ -7,7 +7,10 @@ export function useTimers() {
   const [timers, setTimers] = useState({});
   const [now, setNow] = useState(() => Date.now());
   const beepedRef = useRef({});
-  const warnedRef = useRef({});
+  // The last second each timer ticked for, not a played/not-played flag: the
+  // final ten seconds each get their own tick, and keying the guard on the
+  // second itself makes a repeated callback for the same second a no-op.
+  const lastTickRef = useRef({});
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -23,9 +26,9 @@ export function useTimers() {
             next[id] = { ...timer, running: false, remaining: 0 };
             changed = true;
             if (!beepedRef.current[id]) { beepedRef.current[id] = true; playBeep(); }
-          } else if (remaining <= 10 && !warnedRef.current[id]) {
-            warnedRef.current[id] = true;
-            playCountdownRing();
+          } else if (remaining <= 10 && lastTickRef.current[id] !== remaining) {
+            lastTickRef.current[id] = remaining;
+            playCountdownTick();
           }
         });
         return changed ? next : prev;
@@ -43,7 +46,7 @@ export function useTimers() {
 
   const startTimer = (id) => {
     unlockAudio();
-    beepedRef.current[id] = false; warnedRef.current[id] = false;
+    beepedRef.current[id] = false; lastTickRef.current[id] = null;
     setTimers((prev) => {
       const t = prev[id] || { duration: DEFAULT_DURATION, remaining: DEFAULT_DURATION };
       const remaining = t.remaining ?? t.duration;
@@ -58,7 +61,7 @@ export function useTimers() {
   });
 
   const resetTimer = (id) => {
-    beepedRef.current[id] = false; warnedRef.current[id] = false;
+    beepedRef.current[id] = false; lastTickRef.current[id] = null;
     setTimers((prev) => {
       const t = prev[id] || { duration: DEFAULT_DURATION };
       return { ...prev, [id]: { duration: t.duration, remaining: t.duration, running: false, endTime: null } };
@@ -66,7 +69,7 @@ export function useTimers() {
   };
 
   const setTimerDuration = (id, secs) => {
-    beepedRef.current[id] = false; warnedRef.current[id] = false;
+    beepedRef.current[id] = false; lastTickRef.current[id] = null;
     setTimers((prev) => ({ ...prev, [id]: { duration: secs, remaining: secs, running: false, endTime: null } }));
   };
 
@@ -81,7 +84,7 @@ export function useTimers() {
   const clearTimers = () => {
     setTimers({});
     beepedRef.current = {};
-    warnedRef.current = {};
+    lastTickRef.current = {};
   };
 
   return { timerControls, displayTimer, clearTimers };

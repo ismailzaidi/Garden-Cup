@@ -16,6 +16,7 @@ export const MODE_STAGES = {
   survivor: ["survivor"],
   penalties: ["pens"],
   worldcup: ["wcgroup", "wcko"],
+  leaguechaos: ["lcgroup", "lcfinal"],
 };
 
 export function isValidMode(mode) {

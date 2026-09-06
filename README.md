@@ -3,10 +3,10 @@
 [![CI](https://github.com/ismailzaidi/Garden-Cup/actions/workflows/ci.yml/badge.svg)](https://github.com/ismailzaidi/Garden-Cup/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A 1v1 football tournament tracker for garden matches. Ten game modes, per-match
-timers with audio warnings, goal-minute logging, top-scorer stats, and
-persistent history — installable as a home-screen app and built to keep
-working on a phone with a weak signal.
+A 1v1 football tournament tracker for garden matches. Eleven game modes,
+per-match timers that tick out the final ten seconds aloud, goal-minute
+logging, top-scorer stats, and persistent history — installable as a
+home-screen app and built to keep working on a phone with a weak signal.
 
 ## Modes
 
@@ -20,6 +20,11 @@ working on a phone with a weak signal.
 - **Last One Standing** — everyone plays everyone, bottom of the table goes out each round
 - **Penalty Shootout Cup** — a knockout bracket decided entirely on penalties
 - **Chaos Cup** — round robin where every match is dealt a random silly rule
+- **League + Chaos** — round robin played straight, then a final where every leg has a random silly rule
+
+Fixtures give every player a fair share of home starts: nobody sits through a
+whole tournament kicking off away from home (see `generateGroupMatches` in
+[`src/engine/match.js`](src/engine/match.js)).
 
 New modes are a self-contained file plus one registry line — see
 [`docs/ADDING-A-MODE.md`](docs/ADDING-A-MODE.md) and the contract it

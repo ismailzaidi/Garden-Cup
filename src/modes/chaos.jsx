@@ -1,45 +1,17 @@
 import { Dices } from "lucide-react";
 import { C } from "../lib/theme.js";
-import { generateGroupMatches, shuffle } from "../engine/match.js";
+import { generateGroupMatches } from "../engine/match.js";
+import { dealTwists, twistOf } from "../engine/twists.js";
 import { computeStandings } from "../engine/standings.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
 import MatchCard from "../components/MatchCard.jsx";
 import ProgressBar from "../components/ProgressBar.jsx";
+import TwistBanner from "../components/TwistBanner.jsx";
 
 const DEFAULT_LEGS = 1;
 
-/* Twists are real-world rules for the players, never scoring rules for the
-   app — a twist must never change how a goal counts, or the generic
-   standings stop being valid for this mode. */
-export const TWISTS = [
-  { key: "weak-foot", emoji: "🦶", label: "Weak foot only", detail: "Every shot has to come off your wrong foot." },
-  { key: "one-touch", emoji: "🕐", label: "One touch", detail: "One touch to shoot — no dribbling at all." },
-  { key: "sitting-keeper", emoji: "🧎", label: "Sitting keeper", detail: "Keepers must stay sat on the ground." },
-  { key: "silent", emoji: "🤫", label: "Silent match", detail: "Talk or celebrate out loud and the goal doesn't count." },
-  { key: "slow-mo", emoji: "🐢", label: "Slow-mo celebrations", detail: "Every goal gets a slow-motion replay celebration." },
-  { key: "swap-ends", emoji: "🔁", label: "Swap ends", detail: "Attack the other goal after every goal scored." },
-  { key: "long-range", emoji: "🎯", label: "Long range only", detail: "Goals only count from outside the box or past the cone line." },
-  { key: "hop-start", emoji: "🐸", label: "Hop start", detail: "Restart hopping on one leg until you touch the ball." },
-  { key: "no-looking", emoji: "🙈", label: "No looking", detail: "The taker looks away as they shoot — the keeper picks when." },
-  { key: "commentator", emoji: "👑", label: "Commentator match", detail: "Commentate your own play, in the third person." },
-];
-
 const chaosMatchesOf = (matches) => matches.filter((m) => m.stage === "chaos");
-
-export const twistOf = (key) => TWISTS.find((t) => t.key === key) ?? null;
-
-/* Deal without repeats until the deck runs dry, then reshuffle — so a
-   tournament of ten or fewer matches never sees the same twist twice. */
-export function dealTwists(count, rng = Math.random) {
-  const dealt = [];
-  let deck = [];
-  for (let i = 0; i < count; i++) {
-    if (deck.length === 0) deck = shuffle(TWISTS, rng);
-    dealt.push(deck.shift().key);
-  }
-  return dealt;
-}
 
 function champion({ players, matches }) {
   const cm = chaosMatchesOf(matches);
@@ -49,19 +21,6 @@ function champion({ players, matches }) {
   if (standings.length === 0) return null;
   if (standings.length > 1 && standings[0].pts === standings[1].pts) return null;
   return standings[0];
-}
-
-function TwistBanner({ twist }) {
-  if (!twist) return null;
-  return (
-    <div className="rounded-t-2xl px-4 py-2.5 flex items-center gap-3" style={{ backgroundColor: "#FDF3D9", border: `2px solid ${C.gold}`, borderBottom: "none" }}>
-      <span className="text-2xl flex-shrink-0" aria-hidden="true">{twist.emoji}</span>
-      <div className="min-w-0">
-        <p className="font-bold text-sm truncate" style={{ color: C.ink }}>{twist.label}</p>
-        <p className="text-[11px]" style={{ color: C.sub }}>{twist.detail}</p>
-      </div>
-    </div>
-  );
 }
 
 function FixturesView({ matches, config, nameOf, champion, standings, timerControls, actions }) {

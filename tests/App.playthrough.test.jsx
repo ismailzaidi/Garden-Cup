@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import App from "../src/App.jsx";
+import { TWISTS } from "../src/engine/twists.js";
 
 // No real browser is available in this environment, so these drive the app
 // the same way a manual click-through would: through rendered text and
@@ -345,6 +346,45 @@ describe("Garden World Cup — full playthrough", () => {
 
     clickText(/History/);
     expect(await screen.findAllByText("Garden World Cup")).toHaveLength(2);
+  });
+});
+
+describe("League + Chaos — full playthrough", () => {
+  it("plays the group stage straight, then deals twists to the final", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("League + Chaos");
+    clickText("1"); // legs per pairing
+    clickText("GENERATE FIXTURES");
+
+    // the group stage is played straight — no twist banner anywhere yet
+    await screen.findByText(/Fixtures/);
+    expect(TWISTS.some((t) => screen.queryByText(t.label))).toBe(false);
+    const addGoalButtons = screen.getAllByLabelText("Add goal");
+    expect(addGoalButtons).toHaveLength(2);
+    fireEvent.click(addGoalButtons[0]);
+    fireEvent.click(addGoalButtons[0]);
+    clickText("Mark played");
+
+    clickText("Table");
+    clickText("SET UP CHAOS FINAL (TOP 2)");
+
+    // the final is the only place chaos happens, so its one leg must be
+    // wearing a twist from the deck
+    const finalGoalButtons = await screen.findAllByLabelText("Add goal");
+    expect(finalGoalButtons).toHaveLength(2);
+    expect(TWISTS.some((t) => screen.queryByText(t.label))).toBe(true);
+
+    fireEvent.click(finalGoalButtons[0]);
+    fireEvent.click(finalGoalButtons[0]);
+    clickText("Mark played");
+
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+    expect(screen.getByText(/Won the chaos final 3–0 on points/)).toBeInTheDocument();
+
+    clickText(/History/);
+    expect(await screen.findAllByText("League + Chaos")).toHaveLength(2);
   });
 });
 
