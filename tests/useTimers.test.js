@@ -45,6 +45,21 @@ describe("useTimers countdown ticks", () => {
     expect(playBeep).toHaveBeenCalledTimes(1);
   });
 
+  it("ticks ten times and beeps once for the 30-second preset", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTimers());
+
+    act(() => result.current.timerControls("m1").onSetDuration(30));
+    act(() => result.current.timerControls("m1").onStart());
+    act(() => { vi.advanceTimersByTime(30000); });
+
+    // same shape as the 15s case above: the final ten seconds each tick once,
+    // then the full-time beep — the preset value itself isn't special-cased
+    // anywhere in useTimers, so this just confirms it wires up like any other
+    expect(playCountdownTick).toHaveBeenCalledTimes(10);
+    expect(playBeep).toHaveBeenCalledTimes(1);
+  });
+
   it("ticks from the first second when the duration is under ten seconds", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useTimers());
