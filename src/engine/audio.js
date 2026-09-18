@@ -1,7 +1,5 @@
 /* ---------- audio ---------- */
 
-import { speakWord, WORDS } from "./voice.js";
-
 let sharedAudioCtx = null;
 
 function getAudioContext() {
@@ -44,28 +42,113 @@ export function playBeep() {
   } catch { /* no audio */ }
 }
 
-// Two timers in their final ten would otherwise both start a word in the
-// same setInterval callback, which is mush rather than "talking over each
-// other". This timestamp makes the second timer fall back to the beep;
-// it's a module singleton, same as sharedAudioCtx above.
-let speakingUntil = 0;
+/* ---------- the shared speech primitive ----------
+ * The countdown's numbers, the paused-game reminder, and (via announce.js)
+ * the spoken result all go through this one function and this one voice
+ * selection, so there is exactly one place that decides "is there a voice
+ * we can safely use" — none of the callers duplicate that logic, and none
+ * of them can drift out of step with each other on what counts as safe.
+ *
+ * Local voices only. The original reason was privacy: player and match
+ * names are typed in by a family and should never leave the device just to
+ * be read aloud. That reason still holds, and there is now a second one —
+ * this app is built to keep working with no network at all, and a
+ * network-backed voice would simply fail offline. A local voice is the
+ * only kind that satisfies both.
+ *
+ * getVoices() commonly returns [] until the async "voiceschanged" event
+ * fires once — a call caught in that window can't confirm a local voice
+ * exists. Rather than gamble on the engine's default (which may be a
+ * network voice) or wait and miss the moment, it takes the silent option
+ * for that one call; the listener below means only the first call or two
+ * ever pay that cost, after which the real voice list is cached.
+ */
+let cachedVoices = [];
+let voicesListenerAttached = false;
 
-/* One announcement per second through the final ten: the second's word
-   ("ten" down to "one"), synthesised by voice.js, or the existing 1200 Hz
-   beep as a fallback — when the voice preference is off, `remaining` is
-   outside 1-10, or another timer is already mid-word. Called once per
-   second with the second being announced; never schedules more than one
-   number, so pausing a timer can't leave a queued sequence behind. */
+function localVoice() {
+  const synth = window.speechSynthesis;
+  const fresh = typeof synth.getVoices === "function" ? synth.getVoices() : [];
+  if (fresh && fresh.length) cachedVoices = fresh;
+  if (!voicesListenerAttached && typeof synth.addEventListener === "function") {
+    voicesListenerAttached = true;
+    synth.addEventListener("voiceschanged", () => {
+      cachedVoices = typeof synth.getVoices === "function" ? synth.getVoices() : [];
+    });
+  }
+  const local = cachedVoices.filter((v) => v.localService === true);
+  if (!local.length) return null;
+  // Prefer a voice matching the page's language when there's a choice, but
+  // any local voice beats a network one.
+  const lang = (typeof document !== "undefined" && document.documentElement.lang) || "";
+  const shortLang = lang.slice(0, 2).toLowerCase();
+  return (shortLang && local.find((v) => v.lang && v.lang.slice(0, 2).toLowerCase() === shortLang)) || local[0];
+}
+
+/* Speaks `text` through a confirmed local voice and reports whether it did,
+   so callers decide what — if anything — stands in for it: the countdown
+   falls back to a beep, the paused-game reminder falls back to silence, and
+   the result (announce.js) falls back to its two-note motif. Never throws.
+
+   Cancels whatever the engine is presently saying before speaking again,
+   every single time, with no exception for who owns the outgoing
+   utterance — the countdown speaks once a second and the paused-game
+   reminder repeats every couple of seconds, and either one queuing up
+   behind an unrelated utterance would be worse than cutting it off. */
+export function speak(text, rate = 1) {
+  if (!text) return false;
+  try {
+    if (!getVoicePref()) return false;
+    const synth = window.speechSynthesis;
+    const Utterance = window.SpeechSynthesisUtterance;
+    if (!synth || !Utterance) return false;
+    const voice = localVoice();
+    if (!voice) return false;
+    synth.cancel();
+    const utterance = new Utterance(text);
+    utterance.rate = rate;
+    utterance.voice = voice;
+    synth.speak(utterance);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* Stops whatever the engine is presently saying, without starting anything
+   new. Used when a paused timer resumes, resets, or changes duration: the
+   reminder's own repeat has already stopped by then, but the sentence it
+   most recently started can still be mid-utterance, and it must not be
+   left talking past the moment the reason for it went away. */
+export function cancelSpeech() {
+  try {
+    window.speechSynthesis && window.speechSynthesis.cancel();
+  } catch { /* no speech engine */ }
+}
+
+// Ten words, known in advance, spoken through the same local voice as the
+// paused-game reminder and the spoken result — see speak() above. This used
+// to be synthesised from an OscillatorNode instead; one voice engine for
+// every spoken thing in the app reads better than two.
+const NUMBER_NAMES = {
+  10: "ten", 9: "nine", 8: "eight", 7: "seven", 6: "six",
+  5: "five", 4: "four", 3: "three", 2: "two", 1: "one",
+};
+
+/* One announcement per second through the final ten: the second's number,
+   spoken aloud, or the existing 1200 Hz beep as a fallback — when the
+   voice preference is off, there's no confirmed local voice, or speech
+   isn't available at all. Called once per second with the second being
+   announced; never schedules more than one number, so pausing a timer
+   can't leave a queued sequence behind. */
 export function playCountdownTick(remaining) {
+  const word = NUMBER_NAMES[remaining];
+  if (word && speak(word)) return;
   try {
     unlockAudio();
     const ctx = getAudioContext();
     if (ctx.state !== "running") return; // schedule nothing at all unless running
-    if (!getVoicePref() || !WORDS[remaining] || speakingUntil > ctx.currentTime) {
-      tone(1200, "square", 0, 0.15, 0.25);
-      return;
-    }
-    speakingUntil = speakWord(ctx, WORDS[remaining], ctx.currentTime + 0.03);
+    tone(1200, "square", 0, 0.15, 0.25);
   } catch { /* no audio */ }
 }
 
@@ -94,6 +177,16 @@ export function playResultCue(won) {
   } catch { /* no audio */ }
 }
 
+/* Says "Game paused" through the speak() primitive above, repeated by
+   useTimers every couple of seconds for as long as a timer stays paused —
+   players kept asking whether the game was paused, so one announcement on
+   its own wasn't enough. Deliberately has no beep fallback: when there's
+   nothing to speak with, silence is the honest answer, not an unexplained
+   noise standing in for a sentence nobody can hear. */
+export function playPauseReminder() {
+  speak("Game paused");
+}
+
 /* ---------- the voice preference ----------
  * One key, device-local on purpose: whether *this browser* should talk is a
  * property of the device, not the tournament, so it deliberately sits
@@ -101,7 +194,8 @@ export function playResultCue(won) {
  * cloud sync carries between devices. Stored "0" means off; absence means
  * on, so a fresh install (and everyone who doesn't touch the toggle) gets
  * the countdown voice and the result announcement without doing anything.
- * Gates 5B's result speech and 5A's countdown voice alike.
+ * Gates the countdown, the paused-game reminder, and the spoken result
+ * alike.
  */
 const VOICE_PREF_KEY = "gardenCup:voice";
 
@@ -119,17 +213,11 @@ export function setVoicePref(on) {
   } catch { /* no storage */ }
 }
 
-/* Turning the voice on is itself a user gesture — the one thing iOS wants
-   in order to unlock audio — so the toggle speaks a sample word through
-   the same countdown voice, letting whoever just switched it on hear what
-   it sounds like. Same guards as playCountdownTick, minus the beep
-   fallback: if there's nothing to speak with, this is silent rather than
-   ticking once for no reason. */
+/* Lets whoever just switched the voice on hear a sample of the same voice
+   used for the countdown, the paused-game reminder, and the spoken result.
+   Silent rather than beeping if there's nothing to speak with — a demo that
+   played the wrong sound would be more confusing than one that plays
+   nothing. */
 export function speakVoiceSample() {
-  try {
-    unlockAudio();
-    const ctx = getAudioContext();
-    if (ctx.state !== "running") return;
-    speakingUntil = speakWord(ctx, WORDS[7], ctx.currentTime + 0.03);
-  } catch { /* no audio */ }
+  speak(NUMBER_NAMES[7]);
 }

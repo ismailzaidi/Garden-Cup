@@ -6,9 +6,11 @@ vi.mock("../src/engine/audio.js", () => ({
   unlockAudio: vi.fn(),
   playBeep: vi.fn(),
   playCountdownTick: vi.fn(),
+  playPauseReminder: vi.fn(),
+  cancelSpeech: vi.fn(),
 }));
 
-import { playBeep, playCountdownTick } from "../src/engine/audio.js";
+import { playBeep, playCountdownTick, playPauseReminder, cancelSpeech } from "../src/engine/audio.js";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -136,5 +138,129 @@ describe("useTimers countdown ticks", () => {
     // m1 is at 3 seconds (8 ticks); m2 has run out (10 ticks and a beep)
     expect(playCountdownTick).toHaveBeenCalledTimes(18);
     expect(playBeep).toHaveBeenCalledTimes(1);
+  });
+});
+
+// The 2-second cadence lives in useTimers' own PAUSE_REMINDER_INTERVAL_MS
+// constant; these advance fake time by exactly that much so a change to
+// the constant would fail these tests loudly rather than silently.
+describe("useTimers pause reminder", () => {
+  it("announces once immediately when paused, then again every interval for as long as it stays paused", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTimers());
+
+    act(() => result.current.timerControls("m1").onSetDuration(30));
+    act(() => result.current.timerControls("m1").onStart());
+    act(() => result.current.timerControls("m1").onPause());
+
+    expect(playPauseReminder).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(playPauseReminder).toHaveBeenCalledTimes(2);
+
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(playPauseReminder).toHaveBeenCalledTimes(3);
+  });
+
+  it("stops the repeat the instant play is pressed, with nothing left queued behind it", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTimers());
+
+    act(() => result.current.timerControls("m1").onSetDuration(30));
+    act(() => result.current.timerControls("m1").onStart());
+    act(() => result.current.timerControls("m1").onPause());
+    expect(playPauseReminder).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.timerControls("m1").onStart());
+    expect(cancelSpeech).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(playPauseReminder).toHaveBeenCalledTimes(1); // no further reminders after resuming
+  });
+
+  it("stops the repeat on reset and cancels the in-flight utterance", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTimers());
+
+    act(() => result.current.timerControls("m1").onSetDuration(30));
+    act(() => result.current.timerControls("m1").onStart());
+    act(() => result.current.timerControls("m1").onPause());
+    expect(playPauseReminder).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.timerControls("m1").onReset());
+    expect(cancelSpeech).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(playPauseReminder).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops the repeat when the duration changes while paused", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTimers());
+
+    act(() => result.current.timerControls("m1").onSetDuration(30));
+    act(() => result.current.timerControls("m1").onStart());
+    act(() => result.current.timerControls("m1").onPause());
+    expect(playPauseReminder).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.timerControls("m1").onSetDuration(60));
+    expect(cancelSpeech).toHaveBeenCalledTimes(1);
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(playPauseReminder).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops every running reminder when clearTimers runs", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTimers());
+
+    act(() => {
+      result.current.timerControls("m1").onSetDuration(30);
+      result.current.timerControls("m2").onSetDuration(30);
+    });
+    act(() => {
+      result.current.timerControls("m1").onStart();
+      result.current.timerControls("m2").onStart();
+    });
+    act(() => {
+      result.current.timerControls("m1").onPause();
+      result.current.timerControls("m2").onPause();
+    });
+    expect(playPauseReminder).toHaveBeenCalledTimes(2);
+
+    act(() => result.current.clearTimers());
+    expect(cancelSpeech).toHaveBeenCalledTimes(2);
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(playPauseReminder).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not announce for a timer that was never running", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTimers());
+
+    act(() => result.current.timerControls("m1").onPause()); // never started
+    expect(playPauseReminder).not.toHaveBeenCalled();
+    expect(cancelSpeech).not.toHaveBeenCalled();
+
+    act(() => { vi.advanceTimersByTime(10000); });
+    expect(playPauseReminder).not.toHaveBeenCalled();
+  });
+
+  it("does not announce a second time for a timer that is already paused", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useTimers());
+
+    act(() => result.current.timerControls("m1").onSetDuration(30));
+    act(() => result.current.timerControls("m1").onStart());
+    act(() => result.current.timerControls("m1").onPause());
+    expect(playPauseReminder).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.timerControls("m1").onPause()); // already paused
+    expect(playPauseReminder).toHaveBeenCalledTimes(1); // no extra immediate announce
+
+    // still only the one repeat cycle, not two overlapping ones
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(playPauseReminder).toHaveBeenCalledTimes(2);
   });
 });

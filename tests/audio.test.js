@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 
-/* The seam nothing else covers: useTimers.test.js mocks all of audio.js,
-   and voice.test.js sits below it testing voice.js in isolation. This is
-   the one function that decides whether anything plays at all, so it gets
-   its own hand-rolled Web Audio fake (jsdom has none) rather than reusing
-   the real thing. `sharedAudioCtx` inside audio.js is a module singleton,
-   so every case resets modules and re-imports fresh. */
+/* The seam nothing else covers: useTimers.test.js mocks all of audio.js.
+   This is the one module that decides whether anything plays at all — for
+   both the Web Audio tones (beeps, chimes) and, now, all of the app's
+   speech — so it gets its own hand-rolled fakes rather than reusing the
+   real thing. jsdom implements neither Web Audio nor the Web Speech API at
+   all: AudioContext and speechSynthesis are both undefined. `sharedAudioCtx`
+   and the cached-voices state inside audio.js are module singletons, so
+   every case resets modules and re-imports fresh. */
 
 function makeParam(owner, initial = 0) {
   return {
@@ -91,6 +93,31 @@ async function freshAudio(ctx) {
   return import("../src/engine/audio.js");
 }
 
+// Stands up just enough of the Web Speech API for speak() (and everything
+// built on it) to take its speech path — jsdom has neither
+// SpeechSynthesis nor SpeechSynthesisUtterance at all. `voices` defaults to
+// one local voice; pass [] or a network-only voice to exercise the
+// fallback paths. Returns the utterances actually sent to `speak()` and the
+// `cancel` spy, so tests can assert both what was said and that a repeat
+// doesn't queue behind itself.
+function stubSpeech(voices = [{ name: "Test Voice", lang: "en-US", localService: true }]) {
+  const utterances = [];
+  const cancel = vi.fn();
+  vi.stubGlobal("SpeechSynthesisUtterance", vi.fn(function FakeUtterance(text) {
+    this.text = text;
+    this.rate = 1;
+    this.voice = null;
+  }));
+  vi.stubGlobal("speechSynthesis", {
+    getVoices: () => voices,
+    speak: (u) => utterances.push({ text: u.text, rate: u.rate, voice: u.voice }),
+    cancel,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  });
+  return { utterances, cancel };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();
@@ -98,26 +125,37 @@ afterEach(() => {
 });
 
 describe("playCountdownTick", () => {
-  it("with the voice preference on, gives a voice graph rather than a beep", async () => {
+  it("speaks the word for the second when speech and a local voice are available", async () => {
     const ctx = new FakeAudioContext();
     const audio = await freshAudio(ctx);
     audio.setVoicePref(true);
+    const { utterances } = stubSpeech();
 
     audio.playCountdownTick(7);
 
-    // A voice graph builds more than a single tone: the countdown word for
-    // 7 ("seven") has fricative consonants, so it needs more than one
-    // oscillator and a bank of formant filters neither of which a plain
-    // beep uses.
-    expect(ctx.oscillators.length).toBeGreaterThan(1);
-    expect(ctx.filters.length).toBeGreaterThan(0);
-    expect(ctx.oscillators.some((o) => o.type === "square" && o.frequency.value === 1200)).toBe(false);
+    expect(utterances).toHaveLength(1);
+    expect(utterances[0].text).toBe("seven");
+    expect(ctx.oscillators.length).toBe(0); // no beep when speech succeeds
   });
 
-  it("with the voice preference off, falls back to a single 1200 Hz square tick", async () => {
+  it("speaks the correct word for every one of the final ten seconds", async () => {
     const ctx = new FakeAudioContext();
     const audio = await freshAudio(ctx);
-    audio.setVoicePref(false);
+    audio.setVoicePref(true);
+    const { utterances } = stubSpeech();
+
+    for (let n = 10; n >= 1; n--) audio.playCountdownTick(n);
+
+    expect(utterances.map((u) => u.text)).toEqual([
+      "ten", "nine", "eight", "seven", "six", "five", "four", "three", "two", "one",
+    ]);
+  });
+
+  it("falls back to the 1200 Hz beep when there is no speech engine at all", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(true);
+    // window.speechSynthesis is left unset — the jsdom default
 
     audio.playCountdownTick(7);
 
@@ -127,7 +165,33 @@ describe("playCountdownTick", () => {
     expect(ctx.filters.length).toBe(0);
   });
 
-  it("schedules nothing at all when the context isn't running", async () => {
+  it("falls back to the beep when speech exists but no local voice can be confirmed", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(true);
+    const { utterances } = stubSpeech([{ name: "Cloud Voice", lang: "en-US", localService: false }]);
+
+    audio.playCountdownTick(7);
+
+    expect(utterances).toHaveLength(0);
+    expect(ctx.oscillators.length).toBe(1);
+    expect(ctx.oscillators[0].frequency.value).toBe(1200);
+  });
+
+  it("with the voice preference off, falls back to the beep even with a local voice available", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(false);
+    const { utterances } = stubSpeech();
+
+    audio.playCountdownTick(7);
+
+    expect(utterances).toHaveLength(0);
+    expect(ctx.oscillators.length).toBe(1);
+    expect(ctx.oscillators[0].frequency.value).toBe(1200);
+  });
+
+  it("schedules nothing at all when the context isn't running and there's no speech engine", async () => {
     const ctx = new FakeAudioContext();
     ctx.state = "suspended";
     const audio = await freshAudio(ctx);
@@ -148,6 +212,105 @@ describe("playCountdownTick", () => {
     audio.setVoicePref(true);
 
     expect(() => audio.playCountdownTick(7)).not.toThrow();
+  });
+});
+
+describe("playPauseReminder", () => {
+  it("speaks 'Game paused' when speech and a local voice are available", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(true);
+    const { utterances } = stubSpeech();
+
+    audio.playPauseReminder();
+
+    expect(utterances).toHaveLength(1);
+    expect(utterances[0].text).toBe("Game paused");
+  });
+
+  it("cancels whatever is currently being said before speaking again — no stutter on a repeat", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(true);
+    const { utterances, cancel } = stubSpeech();
+
+    audio.playPauseReminder();
+    audio.playPauseReminder();
+
+    expect(cancel).toHaveBeenCalledTimes(2);
+    expect(utterances).toHaveLength(2);
+  });
+
+  it("is silent — no invented beep — when there is no speech engine at all", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(true);
+
+    expect(() => audio.playPauseReminder()).not.toThrow();
+    expect(ctx.oscillators.length).toBe(0);
+  });
+
+  it("is silent when the voice preference is off", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(false);
+    const { utterances } = stubSpeech();
+
+    audio.playPauseReminder();
+
+    expect(utterances).toHaveLength(0);
+    expect(ctx.oscillators.length).toBe(0);
+  });
+
+  it("is silent when speech exists but no local voice can be confirmed", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(true);
+    const { utterances } = stubSpeech([{ name: "Cloud Voice", lang: "en-US", localService: false }]);
+
+    audio.playPauseReminder();
+
+    expect(utterances).toHaveLength(0);
+    expect(ctx.oscillators.length).toBe(0);
+  });
+});
+
+describe("cancelSpeech", () => {
+  it("cancels the speech engine when one exists", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    const { cancel } = stubSpeech();
+
+    audio.cancelSpeech();
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("never throws when there is no speech engine at all", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+
+    expect(() => audio.cancelSpeech()).not.toThrow();
+  });
+});
+
+describe("speakVoiceSample", () => {
+  it("speaks a sample word when speech and a local voice are available", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+    audio.setVoicePref(true);
+    const { utterances } = stubSpeech();
+
+    audio.speakVoiceSample();
+
+    expect(utterances).toHaveLength(1);
+  });
+
+  it("never throws with no speech engine at all", async () => {
+    const ctx = new FakeAudioContext();
+    const audio = await freshAudio(ctx);
+
+    expect(() => audio.speakVoiceSample()).not.toThrow();
   });
 });
 
