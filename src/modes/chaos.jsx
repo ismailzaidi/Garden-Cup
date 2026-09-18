@@ -68,7 +68,7 @@ export default {
   minPlayers: 2,
   stages: ["chaos"],
   config: {
-    chaosLegs: { type: "choice", label: "Times each pair plays", options: [1, 2], default: DEFAULT_LEGS },
+    chaosLegs: { type: "choice", label: "Times each pair plays", options: [1, 2, 3 , 4], default: DEFAULT_LEGS },
   },
   summary: ({ players, config }) => {
     const legCount = config.chaosLegs ?? DEFAULT_LEGS;
