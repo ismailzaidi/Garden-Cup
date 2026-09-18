@@ -5,22 +5,23 @@
 
 A 1v1 football tournament tracker for garden matches. Eleven game modes,
 per-match timers that tick out the final ten seconds aloud, goal-minute
-logging, top-scorer stats, and persistent history — installable as a
-home-screen app and built to keep working on a phone with a weak signal.
+logging, top-scorer stats, an all-time Wins table, and persistent history —
+installable as a home-screen app and built to keep working on a phone with a
+weak signal.
 
 ## Modes
 
-- **League + Final** — round robin (1–4 legs), top 2 play a final
+- **League + Final** — round robin (1–4 legs), top 2 play a best-of-1 or best-of-3 final
 - **Pure League** — round robin, top of the table wins
 - **Knockout** — randomised single-elimination bracket with automatic byes
 - **Winner Stays On** — king defends the pitch, challengers queue up
 - **Best of N** — two players, a fixed number of legs (3, 5, or 7), most points wins
-- **Garden World Cup** — two groups, then semi-finals, a third-place playoff, and the final
+- **Garden World Cup** — two groups, then semi-finals, a third-place playoff, and a best-of-1 or best-of-3 final
 - **Golden Boot Race** — first player to score N goals in total takes the boot
 - **Last One Standing** — everyone plays everyone, bottom of the table goes out each round
 - **Penalty Shootout Cup** — a knockout bracket decided entirely on penalties
 - **Chaos Cup** — round robin where every match is dealt a random silly rule
-- **League + Chaos** — round robin played straight, then a final where every leg has a random silly rule
+- **League + Chaos** — round robin played straight, then a best-of-1 or best-of-3 final where every leg has a random silly rule
 
 Fixtures give every player a fair share of home starts: nobody sits through a
 whole tournament kicking off away from home (see `generateGroupMatches` in
@@ -90,7 +91,9 @@ Testing Library.
 A database is optional. Every state change writes to the browser's
 `localStorage` first (keys `gardenCup:current` and `gardenCup:history`) — that
 write is synchronous and never depends on a network call, so the app works
-fully offline and requires nothing else to run at all.
+fully offline and requires nothing else to run at all. The Wins tab has no
+storage of its own — it's computed from History, so clearing History clears
+the all-time table too.
 
 **Local-only mode (default):** if `VITE_API_BASE_URL` isn't set, that's the
 whole story — no accounts, no server, data lives only on this device. Use the

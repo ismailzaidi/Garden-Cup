@@ -4,6 +4,7 @@ import { C } from "./lib/theme.js";
 import { useTournament } from "./engine/useTournament.js";
 import SetupView from "./views/SetupView.jsx";
 import StatsView from "./views/StatsView.jsx";
+import WinsView from "./views/WinsView.jsx";
 import HistoryView from "./views/HistoryView.jsx";
 import SyncIndicator from "./components/SyncIndicator.jsx";
 import InstallPrompt from "./components/InstallPrompt.jsx";
@@ -43,11 +44,15 @@ const pillIconBtn = {
   justifyContent: "center",
 };
 
+// Tabs usable with no live tournament — built from history/setup, not the
+// in-progress state — stay enabled regardless of `matches.length`.
+const ALWAYS_ON = new Set(["setup", "wins", "history"]);
+
 function TournamentShell() {
   const { mode, user, logout } = useAuth();
   const {
     players, nameInput, mode: tourneyMode, config, matches, goals, modeState, tab, history,
-    activeMode, standings, champion, nameOf, topScorers, minuteData, quickestGoal, lastGasp,
+    activeMode, standings, champion, nameOf, topScorers, minuteData, quickestGoal, lastGasp, winsTable,
     timerControls, actions,
   } = useTournament();
 
@@ -59,6 +64,7 @@ function TournamentShell() {
     { key: "setup", label: "Players" },
     ...activeMode.tabs({ matches, config, modeState }),
     { key: "stats", label: "Stats" },
+    { key: "wins", label: "Wins" },
     { key: "history", label: history.length ? `History · ${history.length}` : "History" },
   ];
 
@@ -143,7 +149,7 @@ function TournamentShell() {
         <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
           {tabs.map((t) => (
             <button key={t.key} onClick={() => actions.setTab(t.key)}
-              disabled={t.key !== "setup" && t.key !== "history" && matches.length === 0}
+              disabled={!ALWAYS_ON.has(t.key) && matches.length === 0}
               className="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex-shrink-0 transition-colors disabled:opacity-40"
               style={{ backgroundColor: tab === t.key ? C.pitch : "#EAE6D9", color: tab === t.key ? "#F7F5EE" : C.ink }}>
               {t.label}
@@ -160,6 +166,8 @@ function TournamentShell() {
         {tab === "stats" && (
           <StatsView topScorers={topScorers} minuteData={minuteData} quickestGoal={quickestGoal} lastGasp={lastGasp} nameOf={nameOf} />
         )}
+
+        {tab === "wins" && <WinsView winsTable={winsTable} />}
 
         {tab === "history" && <HistoryView history={history} actions={actions} />}
 

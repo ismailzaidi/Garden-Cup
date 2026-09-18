@@ -11,5 +11,6 @@ export const C = {
   sub: "#5C6B57",
 };
 
-export const DURATION_PRESETS = [60, 120, 180, 300];
+// Order matters: MatchTimer renders one button per entry, in array order.
+export const DURATION_PRESETS = [30, 60, 120, 180, 300];
 export const MEDAL_COLORS = ["#F4B942", "#C9CDD3", "#C9793F"];

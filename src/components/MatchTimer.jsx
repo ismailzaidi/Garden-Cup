@@ -1,7 +1,7 @@
 import { Play, Pause, RotateCcw, Timer as TimerIcon } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { DURATION_PRESETS } from "../lib/theme.js";
-import { formatTime } from "../engine/format.js";
+import { formatTime, formatPreset } from "../engine/format.js";
 
 export default function MatchTimer({ timer, onStart, onPause, onReset, onSetDuration }) {
   const { remaining, running, duration } = timer;
@@ -47,7 +47,7 @@ export default function MatchTimer({ timer, onStart, onPause, onReset, onSetDura
           {DURATION_PRESETS.map((secs) => (
             <button key={secs} onClick={() => onSetDuration(secs)} className="flex-1 py-1 rounded-lg text-[11px] font-bold"
               style={{ backgroundColor: duration === secs ? C.pitchLight : "#1B2B18", color: duration === secs ? "#F7F5EE" : "#7C8C77" }}>
-              {secs / 60}m
+              {formatPreset(secs)}
             </button>
           ))}
         </div>

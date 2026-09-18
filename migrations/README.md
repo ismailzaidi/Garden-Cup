@@ -39,3 +39,4 @@ so the ledger stays accurate.
 | File | What it does |
 |---|---|
 | `001_init.sql` | Full initial schema: users, sessions, tournaments, players, matches, goals, mode_queue, tournament_history. The reasoning behind the shape lives inline — the `not an ENUM` comments on every `mode`/`stage` column, and `api/_lib/id.js` for why primary keys are opaque 26-character strings rather than auto-increment integers. |
+| `002_history_results.sql` | Adds nullable `played`/`w`/`d`/`l`/`gf`/`ga` columns to `tournament_history_players`, so the Wins tab can total match wins, not just titles, for tournaments finished after this migration. |
