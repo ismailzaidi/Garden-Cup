@@ -1,16 +1,21 @@
-# Feature plan 2: a 30-second timer, a bigger chaos deck, an all-time Wins tab, a best-of-1 or best-of-3 final
+# Feature plan 2: a 30-second timer, a bigger chaos deck, an all-time Wins tab, a best-of-1 or best-of-3 final, a talking scoreboard
 
-**Status: all four shipped.** Where the built version departs from the
-original plan, the section below says so and why — the descriptions here
-match the code as it stands. The suite went from 161 tests to 209;
-`npm run lint` and `npm run build` are clean.
+**Status: sections 1 to 4 shipped. Section 5 is planned and awaiting
+review.** Where a built version departs from the original plan, the section
+below says so and why — the descriptions of 1 to 4 match the code as it
+stands. The suite went from 161 tests to 209; `npm run lint` and
+`npm run build` are clean.
 
-Four changes, in the order they should be built. The first two are small
+Sections 1 to 4 were four changes, in the order they should be built.
+Section 5 was added afterwards and has not been built. The first two are small
 and self-contained. The third adds a shell-level tab — the first new one
 since History — and, in its second step, the first database migration
 since `001_init.sql`. The fourth gives every mode with a final a setup
 choice between a one-off final and a best-of-three, and settles a
-best-of-three early once it is decided.
+best-of-three early once it is decided. The fifth makes the app talk: a voice
+counting the final ten seconds, synthesised from an `OscillatorNode` rather
+than loaded from a recording, and a spoken result naming the winner and
+loser when a match is marked played.
 
 *Changed from the plan:* the Wins tab shipped before the best-of final
 rather than after it, purely so the two could be built without fighting
@@ -647,16 +652,537 @@ switch. Worth doing if wanted; it is its own plan.
 
 ---
 
+## 5. A talking scoreboard
+
+**Status: planned, not built — awaiting review.** This section was reviewed
+before being finalised; the *Review notes* at the end record what the review
+changed, including one factual claim it corrected.
+
+Two pieces of speech, deliberately built on two different mechanisms:
+
+- **5A — the countdown.** A voice counting the final ten seconds, synthesised
+  from an `OscillatorNode`. Fixed vocabulary, no recordings, no assets.
+- **5B — the result.** When a match is marked played, the app says who won
+  and who lost, by name: *"Bob lost, Tom won."*
+
+They do not share an implementation, and the reason is the whole design
+constraint of this section. 5A says ten words that are known at build time,
+which is exactly what oscillator synthesis can do. 5B says names typed in at
+setup, which it cannot do at any quality, so 5B uses the browser's speech
+engine instead. Keeping them separate means the countdown still works on a
+phone whose speech engine is missing or mute, and the result announcement
+still works if the synthesised voice is switched off.
+
+---
+
+### 5A. The countdown, synthesised with OscillatorNode
+
+#### Today
+
+`src/engine/audio.js` is four functions over one shared `AudioContext`, and
+every sound in the app is generated, not loaded: there is not a single audio
+asset in the repo. One private helper does all the work:
+
+```js
+function tone(freq, type, when, dur, vol)   // one oscillator, one gain, done
+```
+
+`playCountdownTick()` plays a single 1200 Hz square tone every second through
+the final ten. It is unmistakable but it is a beep, and a beep cannot tell
+you *which* second it is — the number only exists on screen, which is no help
+to a player facing away from the phone.
+
+Every function is wrapped in `try/catch` and routes through `unlockAudio()`,
+because iOS refuses to start an `AudioContext` before a user gesture. That
+contract is not negotiable and everything below keeps it.
+
+#### The approach: source-filter synthesis, no samples
+
+A human voice is a buzzing sound source shaped by the resonances of the
+mouth. That is directly reproducible in Web Audio, and it is why an
+`OscillatorNode` can be made to say "three" without a single recorded byte:
+
+- **Source** — one `OscillatorNode`, `type: "sawtooth"`. A sawtooth is used
+  because it is rich in harmonics; a sine has nothing for the filters to
+  shape and would only ever beep.
+- **Filter** — three `BiquadFilterNode`s in **parallel**, each
+  `type: "bandpass"`, tuned to the first three formants of the vowel being
+  spoken, summed back into one gain. Three resonances are what the ear reads
+  as a vowel.
+- **Envelope** — a `GainNode` per word, so words start and stop like speech
+  rather than clicking.
+- **Movement** — formant frequencies are *ramped* during the word. This is
+  what makes it read as speech rather than as a chord: "five" and "nine" are
+  diphthongs whose formants glide, and the glide is most of what identifies
+  them.
+- **Consonants** — see the fricative note below. They are in scope, and they
+  are what separates the ten words from ten vowels.
+
+The result is a small robot counting you down. It will not be mistaken for a
+person, and this plan does not pretend otherwise.
+
+#### Pitch carries the count, vowels are the garnish
+
+The single most useful property here is not vowel intelligibility, it is
+that the ear tracks pitch effortlessly. **Step the fundamental down one
+semitone per number**, about 165 Hz at "ten" down to about 98 Hz at "one".
+A player facing away from the phone then hears the countdown's *position*
+from pitch alone, and the words become a bonus rather than the load-bearing
+part. Direction is a one-line change; try both and keep whichever reads as
+more urgent in the garden.
+
+Scale the formant table by about 1.1 to match the slightly higher voice.
+This also helps on a phone speaker, which reproduces essentially nothing
+below about 400 Hz — F1 of "two", "three" and "six" is simply gone on the
+device no matter how it is tuned, which is another reason not to rest the
+design on vowels.
+
+#### The words
+
+Ten words, not ten vowels. Each is an onset, a nucleus and a coda. Formants
+are F1 / F2 / F3 in Hz; an arrow is a glide across the segment. Nasal murmurs
+are about 250 / 1000 / 2300 with the F2 and F3 branches pulled down about
+10 dB. "Pseudo-fricative" is the two-oscillator noise described below.
+
+| Word | Onset | Nucleus | Coda | ms |
+| --- | --- | --- | --- | --- |
+| ten | /t/ hard onset, 5 ms edge | ɛ 530 / 1840 / 2480 | /n/ murmur, 60 ms | 330 |
+| nine | /n/ murmur, 60 ms | aɪ 730→270 / 1090→2290 / 2440 | /n/ murmur, 60 ms | 420 |
+| eight | none, soft onset | eɪ 400→270 / 2000→2290 / 2600 | /t/ abrupt cutoff then silence | 300 |
+| seven | /s/ pseudo-fricative, 80 ms | ɛ 530 / 1840 / 2480, then ə 500 / 1500 | /v/ voiced fricative 50 ms, /n/ murmur | 480 |
+| six | /s/ pseudo-fricative, 80 ms | ɪ 390 / 1990 / 2550 | closure gap then /ks/ fricative, 80 ms | 320 |
+| five | /f/ pseudo-fricative, 70 ms | aɪ 730→270 / 1090→2290 / 2440 | /v/ voiced fricative, 50 ms | 400 |
+| four | /f/ pseudo-fricative, 70 ms | ɔː 570 / 840 / 2410 | F3 dips to 1800 for r-colour | 350 |
+| three | /θ/ 60 ms, then /r/ F3 1600→3010, F2 1300→2290 | iː 270 / 2290 / 3010 | none | 380 |
+| two | /t/ hard onset, 5 ms edge | uː 300 / 870 / 2240 | none | 300 |
+| one | /w/ 300 / 650, ramping in over 70 ms | ʌ 640 / 1190 / 2390 | /n/ murmur, 60 ms | 340 |
+
+The vowel values are Peterson and Barney male averages and are a starting
+point, not a finished voice. **They must be tuned by ear through a phone
+speaker**, not headphones. Treat this table as the thing most likely to
+change during the build.
+
+Durations differ on purpose. "Six" is one short syllable and "seven" is two;
+that contrast is a cue the ear uses, and flattening every word to the same
+length throws it away. No word may exceed 500 ms: a word that overruns its
+second is a bug, not a style choice.
+
+#### Fricatives without a single sample
+
+Fricatives are noise, and noise is what makes "six", "seven", "three", "five"
+and "four" recognisable. It does **not** require an `AudioBufferSourceNode`:
+two oscillators in heavy frequency modulation — a 5 to 6 kHz square carrier,
+a modulator at a few hundred Hz, a large modulation index — produce a dense,
+hiss-like spectrum that serves perfectly well as /s/ and /f/. Wire it by
+connecting the modulator through a high-gain `GainNode` into the carrier's
+`frequency` param.
+
+This stays entirely inside the brief, costs two more nodes per fricative
+word, and is the single biggest intelligibility win available. It is in
+scope.
+
+#### Filter bandwidths and levels
+
+**Do not use a single `Q` for every branch.** Web Audio's bandpass bandwidth
+is `frequency / Q`, so `Q = 10` at F1 = 270 Hz gives a 27 Hz passband while
+the source's harmonics are 100 to 165 Hz apart. The nearest harmonic falls
+outside the band, the branch drops several dB, and it *warbles* as the
+fundamental glides. Every vowel with a low F1 is affected.
+
+Specify bandwidths and derive Q per target:
+
+| Branch | Bandwidth | Resulting Q |
+| --- | --- | --- |
+| F1 | 80 Hz | roughly 3 to 9 |
+| F2 | 110 Hz | roughly 8 to 20 |
+| F3 | 180 Hz | roughly 13 to 17 |
+
+The rule behind the numbers: every passband must be at least one fundamental
+wide, so it always contains a harmonic. If a single constant per branch is
+wanted instead, `Q` of about 4, 10 and 13 is close enough to start.
+
+A sawtooth's harmonics fall off at 1/n, which leaves F2 of a front vowel like
+"three" far weaker than a real voice. Correct it with per-branch gains — F1
+at 1.0, F2 around 0.6 to 1.0, F3 around 0.3 to 0.5 — or a single `highshelf`
+at 1 kHz, +6 to +9 dB, ahead of the branches.
+
+Sum through a master `GainNode` at or below 0.3, with a
+`DynamicsCompressorNode` on the voice bus. The destination hard-clips, and
+three summed resonant branches reach full scale far more easily than the
+existing 0.1 to 0.25 tones do.
+
+#### Scheduling hygiene
+
+Four rules, each of which is a bug if broken. The existing `tone()` helper is
+*not* a safe template for any of them.
+
+- **Linear ramps, not exponential.** `tone()` uses
+  `exponentialRampToValueAtTime`, which can neither start from nor reach
+  zero. Copying it into an envelope either clicks or throws. Use: gain 0 at
+  the start, linear to level over 15 to 20 ms, linear back to 0 at the end,
+  and `osc.stop(end + 0.02)` — the stop must come *after* the release.
+- **Schedule slightly ahead.** Start each word at `ctx.currentTime + 0.03`,
+  never at `currentTime`. Events placed at "now" are already in the past
+  when the audio thread sees them and get clamped, which is exactly where
+  attack clicks come from.
+- **Skip unless the context is running.** If `ctx.state !== "running"` —
+  locked, backgrounded, or iOS's non-standard `"interrupted"` after a phone
+  call — schedule nothing at all. Today `tone()` queues into a frozen clock
+  and ten queued ticks collapse into one loud tick on resume. Nobody noticed
+  with beeps; ten queued *words* play simultaneously as a chord.
+- **Fix `unlockAudio` while here.** It resumes only on `"suspended"`; it
+  should resume on any state other than `"running"`.
+
+#### Changes
+
+**`src/engine/voice.js`** (new) — the word table and the graph builder, pure
+and context-injected, importing nothing from `audio.js`:
+
+```js
+// ctx is injected rather than imported so the whole module is testable
+// without a browser — jsdom implements no Web Audio at all.
+export function speakWord(ctx, word, startTime) { ... }   // returns end time
+export const WORDS = { 10: "ten", 9: "nine", ... };
+```
+
+It uses factory methods (`ctx.createOscillator()`, `ctx.createBiquadFilter()`,
+`ctx.createGain()`) rather than constructors, matching `audio.js` and keeping
+the test fake simple.
+
+`voice.js` deliberately does **not** wrap itself in `try/catch`. A pure
+module that swallows its own errors makes its tests pass while the graph is
+broken. The `try/catch` belongs at the `audio.js` boundary.
+
+**`src/engine/audio.js`** — keeps the context private. `getAudioContext` is
+*not* exported; instead the ten-line wrapper lives here, inside the existing
+guard:
+
+```js
+export function playCountdownTick(remaining) {
+  try {
+    unlockAudio();
+    const ctx = getAudioContext();
+    if (ctx.state !== "running") return;
+    if (!getVoicePref() || !WORDS[remaining] || speakingUntil > ctx.currentTime) {
+      tone(1200, "square", 0, 0.15, 0.25);       // the existing beep
+      return;
+    }
+    speakingUntil = speakWord(ctx, WORDS[remaining], ctx.currentTime + 0.03);
+  } catch { /* no audio */ }
+}
+```
+
+This keeps the unlock contract in one file, avoids a circular import, and
+leaves `voice.js` a pure table plus graph builder.
+
+`speakingUntil` also settles the two-timer case. The interval loops every
+running timer in one callback, so two timers in their final ten would start
+two words in the same millisecond, which is mush rather than "talking over
+each other". One timestamp makes the second timer fall back to the beep.
+
+`speakFullTime()` is **not** built. "Full time" is two unvoiced consonants
+and would come out as "ull-ime". The triple beep at zero is the signal people
+already know and it stays exactly as it is.
+
+**`src/engine/useTimers.js`** — the entire change is one argument:
+
+```js
+- playCountdownTick();
++ playCountdownTick(remaining);
+```
+
+`remaining` is already in scope at that line, and `useTimers` stays ignorant
+of how the countdown sounds, which is the existing division of labour.
+`speakCount` says **one number per call** — never a whole sequence, which
+would break pause.
+
+**The preference** — one key, `gardenCup:voice`, owned by `audio.js` through
+`getVoicePref()` / `setVoicePref(on)`. Stored `"0"` means off; absence means
+on. It is device-local: not in `exportData`, never synced, and that should be
+stated in the README. One speaker button in the hero's pill row in
+`src/App.jsx`, beside export and import, where it is reachable with no
+tournament in progress, carrying `aria-label` and `aria-pressed` so
+`App.test.jsx` can find it by accessible name. The same key gates 5B.
+
+**Toggling it on speaks a sample word.** The tap is a user gesture, which is
+the one thing iOS wants in order to unlock audio, and the person flipping the
+switch wants to hear what they just turned on. This also quietly retires the
+README's "tap anything once before relying on the warning beep" instruction.
+
+#### Edge cases (must all hold)
+
+- **Audio unavailable or not yet unlocked**: silent, no throw, as today.
+- **Screen locks mid-countdown**: iOS freezes `setInterval` and interrupts
+  the `AudioContext`, so the countdown stops. This is already true of the
+  beep today. On unlock the interval fires once and announces whichever
+  second is current, or beeps if the timer expired meanwhile. Keeping audio
+  alive in a locked pocket is a different feature — a silent media element
+  holding the session open, plus pre-scheduling against the audio clock —
+  and it is explicitly **out of scope** here.
+- **iOS silent switch**: Web Audio is muted by the ringer switch. Nothing in
+  this app makes a sound on a silenced phone, today included. Say so in the
+  README's audio note, and turn the ringer on before judging the voice.
+- **After a phone call or a headphone swap**, Safari has a history of leaving
+  a context running at the wrong sample rate. A beep merely sounds off; a
+  voice shifts every formant and becomes unintelligible. Recovery is to close
+  and recreate the context. Named as a known limitation, not solved here.
+- **Pause inside the final ten** stops the countdown at the next second
+  boundary, as the tick does. A word already scheduled is allowed to finish;
+  cutting a word off mid-vowel sounds broken.
+- **A duration under ten seconds** starts the voice from the first second.
+- **`remaining` outside 1 to 10** falls back to the beep.
+- **Voice off** falls back to the current 1200 Hz tick, unchanged.
+
+#### The acceptance bar
+
+This section replaces a signal that works with one that must be tuned by ear,
+and it does so by default for everyone. So the bar is written down in advance
+rather than judged on the night:
+
+> Played through a phone speaker at about three metres, to someone who has
+> not heard it before and is told only that it is counting, at least 7 of the
+> 10 words are identified correctly when played in shuffled order.
+
+If it misses that bar, ship it default-off or do not ship it. Decide against
+the bar, not against how much work it took.
+
+#### Tests
+
+`audio.js` has no tests at all today, and jsdom implements no Web Audio —
+`AudioContext`, `OfflineAudioContext`, `BiquadFilterNode` and
+`OscillatorNode` are all `undefined` — so this section brings its own
+harness. A hand-rolled fake, not a new dependency: the repo has no
+test-double library and should not grow one for this.
+
+The fake must provide `currentTime`, `destination`, `createOscillator`,
+`createBiquadFilter`, `createGain`, and a fake `AudioParam` recording
+`setValueAtTime`, `linearRampToValueAtTime`, `cancelScheduledValues` and
+`value`, plus every `connect` target so the graph can be walked.
+
+**`tests/voice.test.js`** (new) — assertions that fail if the app is silent,
+not merely if the table was mistyped:
+
+- **Reachability**: walking `connect` from every started oscillator reaches
+  `ctx.destination`.
+- **Non-zero envelope**: every word's master gain schedules at least one
+  value above zero after a zero.
+- **No past events**: every scheduled time is at or after the `startTime`
+  passed in, and every ramp is anchored by a `setValueAtTime` on the same
+  param.
+- **Budget measured on the nodes**: `max(stop times) - startTime` is under
+  0.5 s, so `speakWord` cannot pass by returning a tidy number.
+- **Ten distinct words**: no two words schedule the same set of segments —
+  this is what catches "five" and "nine" being written identically.
+- **Glides ramp, steady vowels do not.**
+- **Every started node is stopped.**
+
+**`tests/audio.test.js`** (new) — the seam nothing else covers, since
+`useTimers.test.js` mocks all of `audio.js` and `voice.test.js` sits below
+it. `vi.stubGlobal("AudioContext", FakeAudioContext)`, and because
+`sharedAudioCtx` is a module singleton, `vi.resetModules()` between cases.
+Assert: preference on gives a voice graph for `playCountdownTick(7)`;
+preference off gives one 1200 Hz square oscillator; a suspended context
+schedules nothing; no `AudioContext` global at all does not throw.
+
+**`tests/useTimers.test.js`** — extend the existing case to assert
+`playCountdownTick` is called *with* the second it announces, counting 10
+down to 1, rather than only counting calls.
+
+**Not testable here, so verify on a phone**, ringer on, through the speaker:
+the acceptance bar above, plus nothing clipping and no word overrunning its
+second.
+
+---
+
+### 5B. The result, spoken when a match is marked played
+
+#### What it says
+
+Marking a match played announces the outcome by name, in the app's own
+voice: *"Bob lost, Tom won."*
+
+The wording is a copy decision, not a technical one, and worth one thought
+before building: this is a kids' app, and naming the loser first every single
+match may land harder than intended. The alternative that keeps the
+information and loses the sting is winner-first — *"Tom won, Bob lost"* — or
+simply *"Tom wins it"*. The example above is what was asked for and is the
+default; changing it is a one-line change to a single template.
+
+#### Why this cannot use the oscillator
+
+5A works because its ten words are known when the code is written. Player
+names are typed in at setup, and turning arbitrary text into speech requires
+grapheme-to-phoneme conversion, which is an entire field and not something to
+hand-roll into a garden football app. There is no version of formant
+synthesis that says "Aarav" or "Sifiso" acceptably.
+
+So 5B uses the browser's built-in `speechSynthesis`. That is a different
+mechanism from 5A with a different set of trade-offs, and the honest summary
+is that it is **more** reliable than 5A in the one way that matters most
+here: it is triggered by a tap.
+
+- **The iOS gesture problem does not apply.** Browsers require a user gesture
+  before speaking. Marking a match played *is* a tap, so the requirement is
+  satisfied by construction. This is the opposite of the countdown, which
+  fires from a timer with no gesture behind it.
+- **Quality varies by device** and is robotic in a plainer way than 5A's
+  voice. Nothing to do about that.
+- **Availability varies.** `window.speechSynthesis` may be missing entirely;
+  jsdom has none, and neither will some embedded browsers.
+
+**Fallback when speech is unavailable or the voice preference is off:** a
+two-note motif through the existing `tone()` helper — rising for a win,
+falling for a draw. The app still tells you something happened; it just does
+not say who.
+
+#### Privacy, which matters more than it looks
+
+Player names are children's names, typed by the family. Some platforms
+provide network-backed voices, which would mean those names leaving the
+device to be spoken. That is not an acceptable default for this app.
+
+**Prefer a local voice explicitly**: filter `getVoices()` to
+`voice.localService === true` and use the first match for the page's
+language. If no local voice exists, fall back to the two-note motif rather
+than speaking through a remote one. Say this in the README next to the note
+about the app working offline.
+
+#### Changes
+
+**`src/engine/announce.js`** (new) — the pure part, separate from `voice.js`
+because it is text, not oscillators:
+
+```js
+/* The sentence is pure so it can be tested without a speech engine. */
+export function resultSentence(match, nameOf) { ... }   // string | null
+export function speakResult(sentence) { ... }           // guarded side effect
+```
+
+`resultSentence` returns `null` for anything that is not a result: a bye, a
+match with a missing player. A drawn match says **"All square"** rather than
+"it's a draw", because in knockout, penalties and World Cup ties the card on
+screen says the match still needs a winner, and the audio must not contradict
+it by announcing a result.
+
+**`src/engine/useTournament.js`** — `togglePlayed` grows from a one-liner,
+following the shape `addGoal` already uses: read the match, fire the sound,
+then set state. The side effect stays *outside* the state updater, which
+matters because React may invoke an updater twice.
+
+```js
+const togglePlayed = (id) => {
+  const match = matches.find((m) => m.id === id);
+  if (match && !match.played) speakResult(resultSentence(match, nameOf));
+  setMatches((p) => p.map((m) => (m.id === id ? { ...m, played: !m.played } : m)));
+};
+```
+
+Announcing only on the false-to-true transition is the whole rule:
+un-marking a match says nothing, and neither does re-marking one that is
+already played.
+
+**`speechSynthesis` handling** inside `speakResult`:
+
+- `speechSynthesis.cancel()` before each utterance, so marking three matches
+  quickly does not queue three sentences deep.
+- `getVoices()` can be empty until the `voiceschanged` event fires; if it is
+  empty on the first call, speak with the engine default rather than waiting,
+  and pick the local voice from then on.
+- Rate around 1.05 so it does not drag; default pitch.
+- Wrapped in `try/catch` like everything else that makes noise.
+
+#### Edge cases (must all hold)
+
+- **Un-marking a played match** is silent.
+- **A bye** is silent: there was no match.
+- **A drawn match** says "All square", in every mode.
+- **Both players named the same thing** produces "Sam lost, Sam won", which
+  is daft but harmless and not worth special-casing.
+- **A very long name** is spoken in full; the 24-character cap already keeps
+  this bounded.
+- **Voice preference off** gives the two-note motif, not silence.
+- **No `speechSynthesis`** gives the two-note motif, no throw.
+- **Marking played while a countdown word is mid-flight**: both sound at
+  once. Accepted — a match being marked played means its timer is finished
+  or irrelevant, so the overlap is rare and brief.
+
+#### Tests
+
+- **`tests/announce.test.js`** (new), pure and the bulk of the value:
+  home win, away win, draw, bye, missing player, and that the sentence names
+  the winner and loser correctly whichever side won. These are ordinary
+  string assertions with no audio anywhere.
+- **`tests/useTournament` coverage via `tests/App.playthrough.test.jsx`** —
+  stub `window.speechSynthesis` with a fake recording utterance text, then
+  assert marking a match played speaks a sentence containing both player
+  names, and that clicking the same button again to un-mark speaks nothing.
+  Use the existing `homeNameOfFirstCard` helper so the assertion does not
+  assume which player drew the home slot.
+- **No speech engine**: with `window.speechSynthesis` deleted, marking a
+  match played does not throw.
+
+---
+
+### Review notes
+
+This section was reviewed before being finalised. What the review changed:
+
+- **The word table was vowels only**, which made "five" and "nine" identical
+  rows — the section's own uniqueness test would have failed against its own
+  data. Onsets, codas and per-word durations were added.
+- **A single `Q` of 10 was wrong** for every low-F1 vowel and would have
+  warbled. Replaced with specified bandwidths, plus per-branch gains to
+  correct the sawtooth's spectral tilt, plus a master level and compressor.
+- **The claim that noise requires an `AudioBufferSourceNode` was wrong.**
+  Two oscillators in heavy FM give a serviceable fricative, so consonants
+  moved from "deferred upgrade" into scope — the single biggest
+  intelligibility win, at the cost of two nodes.
+- **The screen-lock claim was backwards.** The original text implied the
+  oscillator voice survives a screen lock where speech synthesis does not.
+  Neither survives: iOS freezes the interval and interrupts the context.
+  Corrected, and pocket use is now explicitly out of scope.
+- **The proposed tests would all have passed on a silent app.** Rewritten
+  around reachability to the destination, non-zero envelopes, no
+  past-scheduled events, and a node-measured duration budget, plus a new
+  `audio.test.js` for the one function that decides whether anything plays.
+- **`getAudioContext` is no longer exported.** The wrapper moved into
+  `audio.js`, keeping the context private and the unlock contract in one
+  place, and leaving `voice.js` pure.
+- **`speakFullTime` was cut** rather than shipped as an option that cannot
+  sound right.
+- **Scheduling hygiene, the pitch-per-number idea, the two-timer drop rule,
+  the speaker button speaking on toggle, and the acceptance bar** were all
+  added on the review's recommendation.
+
+The review also recommended keeping the result announcement deferred. It is
+included here anyway, at the explicit request of the person the app is for.
+The reasoning for deferring it is preserved above in 5B: it needs a second
+mechanism, and it crosses a boundary the mode contract otherwise keeps clean.
+Both points are now handled rather than dodged — the mechanism is named and
+isolated, and the announcement is driven from `useTournament`, which is the
+one place that already knows both the score and the names.
+
+---
+
 ## Build order & verification
 
-1. **Timer preset** — trivial and independent; ship first.
-2. **Chaos deck** — pure data; ship second. Independent of 1.
+1. **Timer preset** — trivial and independent; ship first. *Shipped.*
+2. **Chaos deck** — pure data; ship second. Independent of 1. *Shipped.*
 3. **Best-of final** — three mode files, one engine module, one line in
    `SetupView`, one line in `contract.md`. Independent of 1 and 2; before
    the Wins tab because it's smaller and touches nothing the Wins tab does.
+   *Shipped, after the Wins tab rather than before it — see the note at the
+   top of this file.*
 4. **Wins tab, step A** — client only; ships and is useful on its own.
+   *Shipped.*
 5. **Wins tab, step B** — migration first, then the API, then the client
-   record change. Depends on 4.
+   record change. Depends on 4. *Shipped alongside step A.*
+6. **Talking scoreboard** — last, and only after review. It depends on
+   nothing above it, but it is the only item whose result cannot be judged
+   from a test run, so it wants a quiet evening and a real garden rather
+   than a slot in a batch. Build 5B first: it is far smaller, it is the
+   part that cannot fail on a tap, and it gives the speaker button
+   something to do while 5A's vowels are still being tuned.
 
 For each step: `npm run lint`, `npm test`, `npm run build`, then on a
 phone: pick `30s` and hear ten ticks and the beep; deal a 5-player, 2-leg
