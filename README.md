@@ -5,8 +5,9 @@
 
 A 1v1 football tournament tracker for garden matches. Eleven game modes,
 per-match timers that tick out the final ten seconds aloud, goal-minute
-logging, top-scorer stats, and persistent history — installable as a
-home-screen app and built to keep working on a phone with a weak signal.
+logging, top-scorer stats, an all-time Wins table, and persistent history —
+installable as a home-screen app and built to keep working on a phone with a
+weak signal.
 
 ## Modes
 
@@ -90,7 +91,9 @@ Testing Library.
 A database is optional. Every state change writes to the browser's
 `localStorage` first (keys `gardenCup:current` and `gardenCup:history`) — that
 write is synchronous and never depends on a network call, so the app works
-fully offline and requires nothing else to run at all.
+fully offline and requires nothing else to run at all. The Wins tab has no
+storage of its own — it's computed from History, so clearing History clears
+the all-time table too.
 
 **Local-only mode (default):** if `VITE_API_BASE_URL` isn't set, that's the
 whole story — no accounts, no server, data lives only on this device. Use the

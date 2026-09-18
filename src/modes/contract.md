@@ -165,8 +165,9 @@ redefining them:
   nothing about which mode is active; the mode's view passes in the values
   (`needsWinner`, `homeTag`, `awayTag`, `hideToggle`, ...) that make them
   behave correctly for that mode.
-- The Stats and History tabs (`views/StatsView.jsx`, `views/HistoryView.jsx`)
-  — every mode gets both, unconditionally, from the shell.
+- The Stats, Wins and History tabs (`views/StatsView.jsx`, `views/WinsView.jsx`,
+  `views/HistoryView.jsx`) — every mode gets all three, unconditionally, from
+  the shell.
 
 Fixture generators and transition logic that only one mode uses
 (`generateFinalMatches`, `makeKingMatch`, `computeKingStreaks`,

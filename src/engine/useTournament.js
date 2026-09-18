@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { makeId } from "./match.js";
 import { computeStandings, computeTopScorers, computeMinuteBuckets } from "./standings.js";
+import { computeWinsTable } from "./wins.js";
 import { migrateState } from "./persistence.js";
 import { playGoalChime } from "./audio.js";
 import { useTimers } from "./useTimers.js";
@@ -186,6 +187,10 @@ export function useTournament() {
   const lastGasp = goals.filter((g) => g.duration > 0 && g.duration - g.second <= 10)
     .sort((a, b) => (a.duration - a.second) - (b.duration - b.second))[0] || null;
 
+  /* all-time — built from history alone, so it works with no live
+     tournament and recomputes for free when an entry is deleted/cleared */
+  const winsTable = useMemo(() => computeWinsTable(history), [history]);
+
   /* history */
   useEffect(() => {
     if (!loaded || historySaved || !champion) return;
@@ -197,6 +202,11 @@ export function useTournament() {
       champion: champion.name,
       topScorer: topScorers[0] ? { name: topScorers[0].name, goals: topScorers[0].goals } : null,
       totalGoals: goals.length,
+      // over every stage the mode ever played, not just the primary one —
+      // a "match win" means the same thing whether it happened in a group
+      // game, a knockout round, or a final leg
+      results: computeStandings(players, matches)
+        .map(({ name, played, w, d, l, gf, ga }) => ({ name, played, w, d, l, gf, ga })),
     };
     setHistory((prev) => {
       const next = [record, ...prev];
@@ -225,7 +235,7 @@ export function useTournament() {
 
   return {
     players, nameInput, mode, config, matches, goals, modeState, tab, history, loaded,
-    activeMode, standings, champion, nameOf, topScorers, minuteData, quickestGoal, lastGasp,
+    activeMode, standings, champion, nameOf, topScorers, minuteData, quickestGoal, lastGasp, winsTable,
     timerControls,
     actions: {
       setNameInput, addPlayer, removePlayer, setMode, setConfigValue,

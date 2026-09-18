@@ -19,10 +19,10 @@ export default withErrorHandling(async (req, res) => {
       const out = [];
       for (const r of rows) {
         const players = await conn.query(
-          "SELECT name FROM tournament_history_players WHERE history_id=? ORDER BY sort_order",
+          "SELECT name, played, w, d, l, gf, ga FROM tournament_history_players WHERE history_id=? ORDER BY sort_order",
           [r.id]
         );
-        out.push({
+        const record = {
           id: r.client_id,
           date: new Date(r.played_at).toISOString(),
           mode: r.mode,
@@ -30,7 +30,16 @@ export default withErrorHandling(async (req, res) => {
           champion: r.champion,
           topScorer: r.top_scorer_name ? { name: r.top_scorer_name, goals: r.top_scorer_goals } : null,
           totalGoals: r.total_goals,
-        });
+        };
+        // pre-002 rows never wrote these columns, so every `w` comes back
+        // NULL — that's "no results", not "0 wins", so the key is omitted
+        // entirely rather than attached with zeroes.
+        if (players.some((p) => p.w !== null)) {
+          record.results = players.map((p) => ({
+            name: p.name, played: p.played ?? 0, w: p.w ?? 0, d: p.d ?? 0, l: p.l ?? 0, gf: p.gf ?? 0, ga: p.ga ?? 0,
+          }));
+        }
+        out.push(record);
       }
       return out;
     });
@@ -52,6 +61,21 @@ export default withErrorHandling(async (req, res) => {
     const topScorerName = record.topScorer && record.topScorer.name ? String(record.topScorer.name).slice(0, 24) : null;
     const topScorerGoals = record.topScorer && Number.isFinite(Number(record.topScorer.goals)) ? Math.trunc(Number(record.topScorer.goals)) : null;
     const playedAt = record.date && !Number.isNaN(Date.parse(record.date)) ? new Date(record.date) : new Date();
+
+    // record.results is step B: per-player match record, keyed by name
+    // since player ids are per-tournament. Older clients never send it.
+    const clampCount = (n) => {
+      const v = Number(n);
+      return Number.isFinite(v) ? Math.max(0, Math.min(65535, Math.trunc(v))) : 0;
+    };
+    const resultByName = new Map();
+    (Array.isArray(record.results) ? record.results.slice(0, 64) : []).forEach((r) => {
+      if (!r || typeof r !== "object" || !r.name) return;
+      resultByName.set(String(r.name).slice(0, 24), {
+        played: clampCount(r.played), w: clampCount(r.w), d: clampCount(r.d),
+        l: clampCount(r.l), gf: clampCount(r.gf), ga: clampCount(r.ga),
+      });
+    });
 
     // A single INSERT ... ON DUPLICATE KEY UPDATE rather than SELECT-then-
     // INSERT: the select-then-insert version has a race (two devices
@@ -76,9 +100,11 @@ export default withErrorHandling(async (req, res) => {
       const inserted = Number(res.affectedRows) === 1;
       if (inserted) {
         for (let i = 0; i < players.length; i++) {
+          const r = resultByName.get(players[i]) || null;
           await conn.query(
-            "INSERT INTO tournament_history_players (history_id, sort_order, name) VALUES (?,?,?)",
-            [historyId, i, players[i]]
+            `INSERT INTO tournament_history_players (history_id, sort_order, name, played, w, d, l, gf, ga)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+            [historyId, i, players[i], r?.played ?? null, r?.w ?? null, r?.d ?? null, r?.l ?? null, r?.gf ?? null, r?.ga ?? null]
           );
         }
       }

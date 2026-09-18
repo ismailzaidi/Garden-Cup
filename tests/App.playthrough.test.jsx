@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { cleanup, render, screen, fireEvent, within } from "@testing-library/react";
 import App from "../src/App.jsx";
 import { TWISTS } from "../src/engine/twists.js";
 
@@ -26,6 +26,21 @@ function clickText(text) {
   fireEvent.click(screen.getByText(text));
 }
 
+// Which player kicks off at home comes out of the fixture draw (the circle
+// seating in generateGroupMatches, and alternateHome's opening flip for a
+// leg series), so a test that wants the *same* player to win two matches
+// has to find their score box by name instead of always clicking the
+// left-hand one. Inside a MatchCard the home player's name is the <p>
+// immediately above the "Home" caption.
+function homeNameOfFirstCard() {
+  return screen.getAllByText("Home")[0].previousElementSibling.textContent;
+}
+
+function addGoalForName(name) {
+  const buttons = screen.getAllByLabelText("Add goal");
+  fireEvent.click(homeNameOfFirstCard() === name ? buttons[0] : buttons[1]);
+}
+
 describe("League + Final — full playthrough", () => {
   it("plays a group match, sets up the final, crowns a champion, and records history", async () => {
     render(<App />);
@@ -34,11 +49,15 @@ describe("League + Final — full playthrough", () => {
     clickText("1"); // legs per pairing
     clickText("GENERATE FIXTURES");
 
-    // one group match, Alice (home) vs Bob (away)
+    // one group match; whoever drew the home slot wins it 2-0, and the same
+    // player is made to win the final below, so the all-time row asserted at
+    // the end is two match wins however the draw fell.
     await screen.findByText(/Fixtures/);
+    const winner = homeNameOfFirstCard();
+    const runnerUp = winner === "Alice" ? "Bob" : "Alice";
     const addGoalButtons = screen.getAllByLabelText("Add goal");
-    fireEvent.click(addGoalButtons[0]); // Alice scores
-    fireEvent.click(addGoalButtons[0]); // Alice scores again -> 2-0
+    fireEvent.click(addGoalButtons[0]);
+    fireEvent.click(addGoalButtons[0]);
     clickText("Mark played");
 
     clickText("Table");
@@ -46,12 +65,12 @@ describe("League + Final — full playthrough", () => {
     clickText("SET UP FINAL (TOP 2)");
 
     // final: same two players, 1 leg — wait for the final's MatchCard, not for
-    // "Alice" by name, since the final standings table (also on this tab)
+    // a player by name, since the final standings table (also on this tab)
     // repeats the same names and makes a bare text query ambiguous.
     const finalGoalButtons = await screen.findAllByLabelText("Add goal");
     expect(finalGoalButtons).toHaveLength(2);
-    fireEvent.click(finalGoalButtons[0]);
-    fireEvent.click(finalGoalButtons[0]);
+    addGoalForName(winner);
+    addGoalForName(winner);
     clickText("Mark played");
 
     expect(await screen.findByText("Champion")).toBeInTheDocument();
@@ -61,6 +80,23 @@ describe("League + Final — full playthrough", () => {
     // "League + Final" now appears twice: the hero's active-mode badge
     // (still showing, regardless of tab) and the new history card.
     expect(await screen.findAllByText("League + Final")).toHaveLength(2);
+
+    // the winner took both the group match (2-0) and the final (2-0), so
+    // their all-time row shows one title and two match wins across the two.
+    clickText("Wins");
+    const winnerRow = (await screen.findByText(winner)).closest("tr");
+    const cells = within(winnerRow).getAllByRole("cell");
+    expect(cells[2]).toHaveTextContent("1"); // titles
+    expect(cells[3]).toHaveTextContent("1"); // played (tournaments entered)
+    expect(cells[4]).toHaveTextContent("2"); // match wins
+
+    // pins the record shape the API relies on: results carries every
+    // player's aggregate across the whole tournament, not just the final.
+    const history = JSON.parse(localStorage.getItem("gardenCup:history"));
+    expect(history[0].champion).toBe(winner);
+    const results = history[0].results;
+    expect(results.find((r) => r.name === winner)).toMatchObject({ w: 2, l: 0 });
+    expect(results.find((r) => r.name === runnerUp)).toMatchObject({ w: 0, l: 2 });
   });
 });
 
