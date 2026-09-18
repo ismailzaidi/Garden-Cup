@@ -96,6 +96,20 @@ describe("worldcup.advance — semi-finals to the final", () => {
     expect([third.p1, third.p2].sort()).toEqual(semiLosers.sort());
   });
 
+  it("builds a three-leg final, home alternating, with a single third-place match, when wcFinalLegs is 3", () => {
+    const { ps, modeState, matches } = toSemis();
+    const decided = matches.map((m) => (m.round === 1 ? { ...m, s1: "3", s2: "0", played: true } : m));
+    const next = advance({ players: ps, matches: decided, config: { wcFinalLegs: 3 }, modeState, rng: seededRng(2) });
+
+    const round2 = next.matches.filter((m) => m.round === 2);
+    const final = round2.filter((m) => !m.thirdPlace);
+    const third = round2.filter((m) => m.thirdPlace);
+    expect(final).toHaveLength(3);
+    expect(third).toHaveLength(1);
+    expect(final[1].p1).toBe(final[0].p2);
+    expect(final[2].p1).toBe(final[0].p1);
+  });
+
   it("does not generate the final twice", () => {
     const { ps, modeState, matches } = toSemis();
     const decided = matches.map((m) => (m.round === 1 ? { ...m, s1: "3", s2: "0", played: true } : m));
@@ -105,8 +119,8 @@ describe("worldcup.advance — semi-finals to the final", () => {
 });
 
 describe("worldcup.champion", () => {
-  const ko = (round, p1, p2, s1, s2, thirdPlace = false, played = true) =>
-    ({ id: `${round}${p1}${p2}`, stage: "wcko", round, p1, p2, s1: String(s1), s2: String(s2), played, thirdPlace });
+  const ko = (round, p1, p2, s1, s2, thirdPlace = false, played = true, leg = 1) =>
+    ({ id: `${round}${p1}${p2}${leg}`, stage: "wcko", round, leg, p1, p2, s1: String(s1), s2: String(s2), played, thirdPlace });
 
   const ps = [{ id: "a", name: "Alice" }, { id: "b", name: "Bob" }, { id: "c", name: "Cara" }, { id: "d", name: "Dara" }];
   const champ = (matches) => worldcup.champion({ players: ps, matches, config: {}, modeState: {} });
@@ -115,13 +129,24 @@ describe("worldcup.champion", () => {
     expect(champ([ko(1, "a", "b", 2, 0)])).toBeNull();
   });
 
-  it("comes from the final, never the third-place match", () => {
-    const matches = [ko(2, "a", "b", 3, 1), ko(2, "c", "d", 5, 0, true)];
+  it("comes from the final, never the third-place match — first to two legs", () => {
+    // a leg series: Alice is first to two, the third leg stays unplayed
+    const matches = [
+      ko(2, "a", "b", 3, 1, false, true, 1),
+      ko(2, "a", "b", 2, 0, false, true, 2),
+      ko(2, "a", "b", 0, 0, false, false, 3),
+      ko(2, "c", "d", 5, 0, true),
+    ];
     expect(champ(matches).name).toBe("Alice");
   });
 
   it("is null while the final is level or unplayed", () => {
     expect(champ([ko(2, "a", "b", 1, 1)])).toBeNull();
     expect(champ([ko(2, "a", "b", 0, 0, false, false)])).toBeNull();
+  });
+
+  it("is null on a one-legged final that's still level, even with a lop-sided third-place score", () => {
+    // the third-place match must never leak into the final's series table
+    expect(champ([ko(2, "a", "b", 1, 1), ko(2, "c", "d", 9, 0, true)])).toBeNull();
   });
 });

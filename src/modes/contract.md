@@ -31,6 +31,18 @@ export default {
       options: [2, 3, 4, 5],
       default: 3,
     },
+    finalLegs: {
+      type: "choice",
+      label: "The final",
+      options: [1, 3],
+      default: 3,
+      format: (n) => `Best of ${n}`,   // optional — SetupView renders
+                                        // `spec.format ? spec.format(opt) : opt`,
+                                        // so a picker's buttons can read
+                                        // "Best of 1" / "Best of 3" instead of
+                                        // a bare option value. The stored
+                                        // config value is still the raw option.
+    },
   },
   summary: ({ players, config }) => <>...</>,   // the setup-screen blurb
   generateLabel: "GENERATE BRACKET",            // initial button label; the

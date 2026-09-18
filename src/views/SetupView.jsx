@@ -38,7 +38,7 @@ export default function SetupView({ players, nameInput, mode, config, matches, a
               {spec.options.map((opt) => (
                 <button key={opt} onClick={() => actions.setConfigValue(key, opt)} className="flex-1 py-2.5 rounded-xl text-sm font-bold"
                   style={{ backgroundColor: value === opt ? C.pitch : "#fff", color: value === opt ? "#F7F5EE" : C.ink, border: `2px solid ${value === opt ? C.pitch : C.line}` }}>
-                  {opt}
+                  {spec.format ? spec.format(opt) : opt}
                 </button>
               ))}
             </div>

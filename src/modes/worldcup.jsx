@@ -1,23 +1,36 @@
 import { Globe, ChevronRight } from "lucide-react";
 import { C } from "../lib/theme.js";
-import { makeId, randomOrder, matchWinner, generateGroupMatches, shuffle } from "../engine/match.js";
+import { makeId, randomOrder, alternateHome, matchWinner, generateGroupMatches, shuffle } from "../engine/match.js";
 import { computeStandings } from "../engine/standings.js";
+import { seriesWinner } from "../engine/series.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import MatchCard from "../components/MatchCard.jsx";
 import SectionLabel from "../components/SectionLabel.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
 
 const DEFAULT_LEGS = 1;
+// The final defaults to one match, unlike the two league modes — that's the
+// one match Garden World Cup has today, unchanged unless chosen otherwise.
+const DEFAULT_FINAL_LEGS = 1;
 const GROUP_KEYS = ["A", "B"];
 
 const groupMatchesOf = (matches) => matches.filter((m) => m.stage === "wcgroup");
 const koMatchesOf = (matches) => matches.filter((m) => m.stage === "wcko");
-const finalOf = (matches) => koMatchesOf(matches).find((m) => m.round === 2 && !m.thirdPlace) ?? null;
+const finalLegsOf = (matches) => koMatchesOf(matches).filter((m) => m.round === 2 && !m.thirdPlace).sort((a, b) => a.leg - b.leg);
 const thirdPlaceOf = (matches) => koMatchesOf(matches).find((m) => m.round === 2 && m.thirdPlace) ?? null;
 
 function makeKoMatch(round, x, y, rng, extra = {}) {
   const [p1, p2] = randomOrder(x, y, rng);
   return { id: makeId(), stage: "wcko", round, p1, p2, s1: "0", s2: "0", played: false, thirdPlace: false, ...extra };
+}
+
+/* The final is a leg series like any other Best of N, so it needs
+   alternateHome (one flip picks who hosts leg 1) rather than a per-leg
+   coin flip — randomOrder per leg could hand one finalist every away start. */
+function makeFinalLegs(x, y, legCount, rng) {
+  return alternateHome(x, y, legCount, rng).map(([a, b], i) => (
+    { id: makeId(), stage: "wcko", round: 2, leg: i + 1, p1: a, p2: b, s1: "0", s2: "0", played: false, thirdPlace: false }
+  ));
 }
 
 /* One group's own table. The shell's generic `standings` prop covers every
@@ -42,13 +55,16 @@ function semiState(matches) {
 }
 
 function champion({ players, matches }) {
-  const final = finalOf(matches);
-  if (!final) return null;
-  const winner = matchWinner(final);
-  return winner ? players.find((p) => p.id === winner) ?? null : null;
+  const finalLegs = finalLegsOf(matches);
+  if (finalLegs.length === 0) return null;
+  const finalists = players.filter((p) => p.id === finalLegs[0].p1 || p.id === finalLegs[0].p2);
+  // Every knockout card carries `needsWinner`, so a played tie here is a leg
+  // still waiting on a decider: it earns both finalists a point and never
+  // widens the lead, so seriesWinner can't crown anyone off an undecided leg.
+  return seriesWinner(finalists, finalLegs);
 }
 
-export function advance({ players, matches, modeState, rng = Math.random }) {
+export function advance({ players, matches, config, modeState, rng = Math.random }) {
   const ko = koMatchesOf(matches);
 
   /* group stage -> semi-finals: winners cross over, A1 v B2 and B1 v A2 */
@@ -68,10 +84,11 @@ export function advance({ players, matches, modeState, rng = Math.random }) {
   const { semis, winners, decided } = semiState(matches);
   if (!decided) return { matches, modeState, tab: "knockout" };
   const losers = semis.map((m) => (matchWinner(m) === m.p1 ? m.p2 : m.p1));
+  const finalLegs = config.wcFinalLegs ?? DEFAULT_FINAL_LEGS;
   return {
     matches: [
       ...matches,
-      makeKoMatch(2, winners[0], winners[1], rng),
+      ...makeFinalLegs(winners[0], winners[1], finalLegs, rng),
       makeKoMatch(2, losers[0], losers[1], rng, { thirdPlace: true }),
     ],
     modeState,
@@ -139,9 +156,9 @@ function KnockoutSection({ title, matches, nameOf, timerControls, actions }) {
 
 function FinalsView({ matches, nameOf, champion, timerControls, actions }) {
   const { semis, decided } = semiState(matches);
-  const final = finalOf(matches);
+  const finalLegs = finalLegsOf(matches);
   const third = thirdPlaceOf(matches);
-  const canAdvance = decided && !final;
+  const canAdvance = decided && finalLegs.length === 0;
   const bronze = third && matchWinner(third);
 
   return (
@@ -170,7 +187,7 @@ function FinalsView({ matches, nameOf, champion, timerControls, actions }) {
         </p>
       )}
 
-      <KnockoutSection title="THE FINAL" matches={final ? [final] : []} nameOf={nameOf} timerControls={timerControls} actions={actions} />
+      <KnockoutSection title="THE FINAL" matches={finalLegs} nameOf={nameOf} timerControls={timerControls} actions={actions} />
 
       {semis.length > 0 && !decided && (
         <p className="text-xs text-center" style={{ color: C.mute }}>
@@ -190,24 +207,27 @@ export default {
   stages: ["wcgroup", "wcko"],
   config: {
     groupLegs: { type: "choice", label: "Group games between each pair", options: [1, 2], default: DEFAULT_LEGS },
+    wcFinalLegs: { type: "choice", label: "The final", options: [1, 3], default: DEFAULT_FINAL_LEGS, format: (n) => `Best of ${n}` },
   },
   summary: ({ players, config }) => {
     const legs = config.groupLegs ?? DEFAULT_LEGS;
+    const finalLegs = config.wcFinalLegs ?? DEFAULT_FINAL_LEGS;
     const a = Math.ceil(players.length / 2);
     const b = players.length - a;
     const count = ((a * (a - 1)) / 2 + (b * (b - 1)) / 2) * legs;
     return (
       <>
         <b style={{ color: C.ink }}>{players.length} players</b> split into two groups ({a} and {b}) for{" "}
-        <b style={{ color: C.ink }}>{count} group matches</b>. Top two of each go through to the semis, then the final —
-        and the losers play off for third.
+        <b style={{ color: C.ink }}>{count} group matches</b>. Top two of each go through to the semis, then a{" "}
+        <b style={{ color: C.ink }}>best-of-{finalLegs} final</b> — and the losers play off for third.
       </>
     );
   },
   generateLabel: "KICK OFF THE GROUP STAGE",
   subtitle: ({ config }) => {
     const legs = config.groupLegs ?? DEFAULT_LEGS;
-    return `GARDEN WORLD CUP · TWO GROUPS · ${legs} GAME${legs > 1 ? "S" : ""} EACH · SEMIS & FINAL`;
+    const finalLegs = config.wcFinalLegs ?? DEFAULT_FINAL_LEGS;
+    return `GARDEN WORLD CUP · TWO GROUPS · ${legs} GAME${legs > 1 ? "S" : ""} EACH · BEST-OF-${finalLegs} FINAL`;
   },
   createFixtures: ({ players, config, rng = Math.random }) => {
     const legs = config.groupLegs ?? DEFAULT_LEGS;

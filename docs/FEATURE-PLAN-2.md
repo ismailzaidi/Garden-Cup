@@ -1,11 +1,35 @@
 # Feature plan 2: a 30-second timer, a bigger chaos deck, an all-time Wins tab, a best-of-1 or best-of-3 final
 
-**Status: planned, not built.** Four changes, in the order they should be
-built. The first two are small and self-contained. The third adds a
-shell-level tab — the first new one since History — and, in its second
-step, the first database migration since `001_init.sql`. The fourth gives
-every mode with a final a setup choice between a one-off final and a
-best-of-three, and settles a best-of-three early once it is decided.
+**Status: all four shipped.** Where the built version departs from the
+original plan, the section below says so and why — the descriptions here
+match the code as it stands. The suite went from 161 tests to 209;
+`npm run lint` and `npm run build` are clean.
+
+Four changes, in the order they should be built. The first two are small
+and self-contained. The third adds a shell-level tab — the first new one
+since History — and, in its second step, the first database migration
+since `001_init.sql`. The fourth gives every mode with a final a setup
+choice between a one-off final and a best-of-three, and settles a
+best-of-three early once it is decided.
+
+*Changed from the plan:* the Wins tab shipped before the best-of final
+rather than after it, purely so the two could be built without fighting
+over the same three files; neither depends on the other. Both Wins steps
+shipped together, so the `W` column never had to live through a release
+showing a dash for every row. Two details the plan left implicit were
+settled while building: Win % renders a dash rather than dividing by zero
+for the defensive "champion not in the players list" case, and the
+footnote's caveat about match wins is always shown rather than appearing
+only once a partial row exists, since the caveat is permanently true.
+
+One bug surfaced that the plan did not anticipate. The first version of
+the Wins assertions in `tests/App.playthrough.test.jsx` assumed a named
+player wins, but which player starts at home is drawn at random by the
+fixture generator, so the test passed or failed depending on the draw.
+The playthrough now reads the home player's name out of the match card
+and scores for that player by name. `homeNameOfFirstCard` and
+`addGoalForName` at the top of that file exist for this, and any future
+playthrough that needs a specific player to win should use them.
 
 Same conventions as [`FEATURE-PLAN.md`](./FEATURE-PLAN.md): pure logic in
 `engine/` with tests under `tests/`, nothing mode-specific in the shell,

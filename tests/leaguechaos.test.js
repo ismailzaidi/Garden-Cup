@@ -36,7 +36,7 @@ describe("leaguechaos.advance", () => {
   const groupMatches = [group("p0", "p1", 3, 0), group("p0", "p2", 3, 0), group("p1", "p2", 2, 0)];
 
   it("sends the top two into the final and deals every leg a twist", () => {
-    const result = advance({ players: players(3), matches: groupMatches, config: { legCount: 3 }, rng: seededRng(9) });
+    const result = advance({ players: players(3), matches: groupMatches, config: { finalLegs: 3 }, rng: seededRng(9) });
     const final = result.matches.filter((m) => m.stage === "lcfinal");
     expect(final).toHaveLength(3);
     expect(final.every((m) => twistOf(m.twist) !== null)).toBe(true);
@@ -45,25 +45,32 @@ describe("leaguechaos.advance", () => {
   });
 
   it("never repeats a twist within one deal of the final", () => {
-    const result = advance({ players: players(3), matches: groupMatches, config: { legCount: 4 }, rng: seededRng(21) });
+    // three is the maximum a final can be (Best of 1 or Best of 3), so this
+    // pins the no-repeat guarantee at the largest final the setup screen offers.
+    const result = advance({ players: players(3), matches: groupMatches, config: { finalLegs: 3 }, rng: seededRng(21) });
     const dealt = result.matches.filter((m) => m.stage === "lcfinal").map((m) => m.twist);
-    expect(dealt).toHaveLength(4);
-    expect(new Set(dealt).size).toBe(4);
+    expect(dealt).toHaveLength(3);
+    expect(new Set(dealt).size).toBe(3);
     expect(dealt.length).toBeLessThanOrEqual(TWISTS.length);
   });
 
   it("alternates the home side across the final's legs", () => {
-    const final = advance({ players: players(3), matches: groupMatches, config: { legCount: 3 }, rng: seededRng(9) })
+    const final = advance({ players: players(3), matches: groupMatches, config: { finalLegs: 3 }, rng: seededRng(9) })
       .matches.filter((m) => m.stage === "lcfinal");
     expect(final[1].p1).toBe(final[0].p2);
     expect(final[2].p1).toBe(final[0].p1);
   });
 
   it("keeps the group stage intact and replaces an earlier final rather than appending", () => {
-    const once = advance({ players: players(3), matches: groupMatches, config: { legCount: 2 }, rng: seededRng(9) });
-    const twice = advance({ players: players(3), matches: once.matches, config: { legCount: 2 }, rng: seededRng(31) });
+    const once = advance({ players: players(3), matches: groupMatches, config: { finalLegs: 1 }, rng: seededRng(9) });
+    const twice = advance({ players: players(3), matches: once.matches, config: { finalLegs: 1 }, rng: seededRng(31) });
     expect(twice.matches.filter((m) => m.stage === "lcgroup")).toHaveLength(3);
-    expect(twice.matches.filter((m) => m.stage === "lcfinal")).toHaveLength(2);
+    expect(twice.matches.filter((m) => m.stage === "lcfinal")).toHaveLength(1);
+  });
+
+  it("defaults the final to three legs when finalLegs isn't set", () => {
+    const result = advance({ players: players(3), matches: groupMatches, config: {}, rng: seededRng(9) });
+    expect(result.matches.filter((m) => m.stage === "lcfinal")).toHaveLength(3);
   });
 
   it("returns the state unchanged when there aren't two players to promote", () => {
@@ -96,5 +103,14 @@ describe("leaguechaos.champion", () => {
     // b lost the group stage but wins the final — the final is what counts
     const matches = [group("a", "b", 5, 0), final("b", "a", 2, 0)];
     expect(leaguechaos.champion({ players: ps, matches, config: {}, modeState: {} }).id).toBe("b");
+  });
+
+  it("settles a best-of-3 chaos final early, two legs up with the third still unplayed", () => {
+    const matches = [
+      final("a", "b", 2, 0),
+      { ...final("b", "a", 0, 1), id: "f2" },
+      { ...final("a", "b", 0, 0, false), id: "f3" },
+    ];
+    expect(leaguechaos.champion({ players: ps, matches, config: { finalLegs: 3 }, modeState: {} }).id).toBe("a");
   });
 });

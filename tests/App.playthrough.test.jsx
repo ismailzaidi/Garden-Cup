@@ -41,12 +41,26 @@ function addGoalForName(name) {
   fireEvent.click(homeNameOfFirstCard() === name ? buttons[0] : buttons[1]);
 }
 
+// Same idea as the two helpers above, generalised to a screen with several
+// leg cards at once (a best-of-3 final): the nth "Home" label belongs to the
+// nth card, and that card's two "Add goal" buttons sit at [2n, 2n+1].
+function homeNameOfCard(index) {
+  return screen.getAllByText("Home")[index].previousElementSibling.textContent;
+}
+
+function addGoalForNameInLeg(name, legIndex) {
+  const buttons = screen.getAllByLabelText("Add goal");
+  const isHome = homeNameOfCard(legIndex) === name;
+  fireEvent.click(buttons[legIndex * 2 + (isHome ? 0 : 1)]);
+}
+
 describe("League + Final — full playthrough", () => {
   it("plays a group match, sets up the final, crowns a champion, and records history", async () => {
     render(<App />);
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("1"); // legs per pairing
+    clickText("Best of 1"); // the final
     clickText("GENERATE FIXTURES");
 
     // one group match; whoever drew the home slot wins it 2-0, and the same
@@ -97,6 +111,46 @@ describe("League + Final — full playthrough", () => {
     const results = history[0].results;
     expect(results.find((r) => r.name === winner)).toMatchObject({ w: 2, l: 0 });
     expect(results.find((r) => r.name === runnerUp)).toMatchObject({ w: 0, l: 2 });
+  });
+});
+
+describe("League + Final — best-of-3 settles early", () => {
+  it("crowns a champion two legs up, leaving the third leg unplayed", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("1"); // legs per pairing
+    clickText("Best of 3"); // the final — also today's default, clicked for clarity
+    clickText("GENERATE FIXTURES");
+
+    await screen.findByText(/Fixtures/);
+    const winner = homeNameOfFirstCard();
+    const addGoalButtons = screen.getAllByLabelText("Add goal");
+    fireEvent.click(addGoalButtons[0]);
+    fireEvent.click(addGoalButtons[0]);
+    clickText("Mark played");
+
+    clickText("Table");
+    clickText("SET UP FINAL (TOP 2)");
+
+    // three legs, home alternating
+    expect(await screen.findAllByLabelText("Add goal")).toHaveLength(6);
+
+    // leg 1: winner scores twice, then it's marked played
+    addGoalForNameInLeg(winner, 0);
+    addGoalForNameInLeg(winner, 0);
+    fireEvent.click(screen.getAllByText("Mark played")[0]);
+
+    // leg 2: winner scores twice more — 2-0 up now, decided with a leg to spare
+    addGoalForNameInLeg(winner, 1);
+    addGoalForNameInLeg(winner, 1);
+    fireEvent.click(screen.getAllByText("Mark played")[0]);
+
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+    expect(screen.getByText(/Won the final 6–0 on points/)).toBeInTheDocument();
+
+    // the third leg is still sitting there, unplayed, honestly
+    expect(screen.getAllByText("Mark played")).toHaveLength(1);
   });
 });
 
@@ -392,6 +446,7 @@ describe("League + Chaos — full playthrough", () => {
     addPlayer("Bob");
     clickText("League + Chaos");
     clickText("1"); // legs per pairing
+    clickText("Best of 1"); // the final
     clickText("GENERATE FIXTURES");
 
     // the group stage is played straight — no twist banner anywhere yet
