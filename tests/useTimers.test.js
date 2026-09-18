@@ -33,10 +33,13 @@ describe("useTimers countdown ticks", () => {
     // crosses into the final ten
     act(() => { vi.advanceTimersByTime(1000); });
     expect(playCountdownTick).toHaveBeenCalledTimes(1);
+    expect(playCountdownTick).toHaveBeenCalledWith(10);
 
-    // one tick for every remaining second — 10 down to 1 — then full time
+    // one tick for every remaining second — 10 down to 1 — then full time,
+    // each call carrying the second it's announcing rather than a bare tick
     act(() => { vi.advanceTimersByTime(10000); });
     expect(playCountdownTick).toHaveBeenCalledTimes(10);
+    expect(playCountdownTick.mock.calls.map((c) => c[0])).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
     expect(playBeep).toHaveBeenCalledTimes(1);
 
     // time already elapsed — nothing fires again
@@ -83,16 +86,19 @@ describe("useTimers countdown ticks", () => {
     // run down to 7 seconds remaining: ticks at 10, 9, 8, 7
     act(() => { vi.advanceTimersByTime(8000); });
     expect(playCountdownTick).toHaveBeenCalledTimes(4);
+    expect(playCountdownTick.mock.calls.map((c) => c[0])).toEqual([10, 9, 8, 7]);
 
     act(() => result.current.timerControls("m1").onPause());
     act(() => { vi.advanceTimersByTime(5000); });
     expect(playCountdownTick).toHaveBeenCalledTimes(4); // silent while paused
 
     // resuming continues at 6, 5, 4, 3, 2, 1 rather than restarting the
-    // countdown — ten ticks for the run, however often it was paused
+    // countdown — ten ticks for the run, however often it was paused, each
+    // still carrying the correct second
     act(() => result.current.timerControls("m1").onStart());
     act(() => { vi.advanceTimersByTime(7000); });
     expect(playCountdownTick).toHaveBeenCalledTimes(10);
+    expect(playCountdownTick.mock.calls.map((c) => c[0])).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
     expect(playBeep).toHaveBeenCalledTimes(1);
   });
 

@@ -1,5 +1,7 @@
 /* ---------- audio ---------- */
 
+import { speakWord, WORDS } from "./voice.js";
+
 let sharedAudioCtx = null;
 
 function getAudioContext() {
@@ -13,7 +15,11 @@ function getAudioContext() {
 export function unlockAudio() {
   try {
     const ctx = getAudioContext();
-    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    // Resume on anything other than "running" — not just "suspended". iOS
+    // has a non-standard "interrupted" state after a phone call, and a
+    // locked/backgrounded tab can land somewhere else again; all of them
+    // need the same nudge.
+    if (ctx.state !== "running") ctx.resume().catch(() => {});
   } catch { /* no audio */ }
 }
 
@@ -38,13 +44,28 @@ export function playBeep() {
   } catch { /* no audio */ }
 }
 
-/* One tick per second through the final ten. Kept to a single short tone so
-   ten of them in a row read as a countdown rather than as ten alarms, and
-   pitched well above the goal chime so the two are never confused. */
-export function playCountdownTick() {
+// Two timers in their final ten would otherwise both start a word in the
+// same setInterval callback, which is mush rather than "talking over each
+// other". This timestamp makes the second timer fall back to the beep;
+// it's a module singleton, same as sharedAudioCtx above.
+let speakingUntil = 0;
+
+/* One announcement per second through the final ten: the second's word
+   ("ten" down to "one"), synthesised by voice.js, or the existing 1200 Hz
+   beep as a fallback — when the voice preference is off, `remaining` is
+   outside 1-10, or another timer is already mid-word. Called once per
+   second with the second being announced; never schedules more than one
+   number, so pausing a timer can't leave a queued sequence behind. */
+export function playCountdownTick(remaining) {
   try {
     unlockAudio();
-    tone(1200, "square", 0, 0.15, 0.25);
+    const ctx = getAudioContext();
+    if (ctx.state !== "running") return; // schedule nothing at all unless running
+    if (!getVoicePref() || !WORDS[remaining] || speakingUntil > ctx.currentTime) {
+      tone(1200, "square", 0, 0.15, 0.25);
+      return;
+    }
+    speakingUntil = speakWord(ctx, WORDS[remaining], ctx.currentTime + 0.03);
   } catch { /* no audio */ }
 }
 
@@ -80,7 +101,7 @@ export function playResultCue(won) {
  * cloud sync carries between devices. Stored "0" means off; absence means
  * on, so a fresh install (and everyone who doesn't touch the toggle) gets
  * the countdown voice and the result announcement without doing anything.
- * Gates 5B's result speech now, and will gate 5A's countdown voice too.
+ * Gates 5B's result speech and 5A's countdown voice alike.
  */
 const VOICE_PREF_KEY = "gardenCup:voice";
 
@@ -96,4 +117,19 @@ export function setVoicePref(on) {
   try {
     localStorage.setItem(VOICE_PREF_KEY, on ? "1" : "0");
   } catch { /* no storage */ }
+}
+
+/* Turning the voice on is itself a user gesture — the one thing iOS wants
+   in order to unlock audio — so the toggle speaks a sample word through
+   the same countdown voice, letting whoever just switched it on hear what
+   it sounds like. Same guards as playCountdownTick, minus the beep
+   fallback: if there's nothing to speak with, this is silent rather than
+   ticking once for no reason. */
+export function speakVoiceSample() {
+  try {
+    unlockAudio();
+    const ctx = getAudioContext();
+    if (ctx.state !== "running") return;
+    speakingUntil = speakWord(ctx, WORDS[7], ctx.currentTime + 0.03);
+  } catch { /* no audio */ }
 }

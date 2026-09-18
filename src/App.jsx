@@ -2,8 +2,7 @@ import { useRef, useState } from "react";
 import { RotateCcw, Download, Upload, LogOut, Volume2, VolumeX } from "lucide-react";
 import { C } from "./lib/theme.js";
 import { useTournament } from "./engine/useTournament.js";
-import { getVoicePref, setVoicePref } from "./engine/audio.js";
-import { speakResult } from "./engine/announce.js";
+import { getVoicePref, setVoicePref, speakVoiceSample } from "./engine/audio.js";
 import SetupView from "./views/SetupView.jsx";
 import StatsView from "./views/StatsView.jsx";
 import WinsView from "./views/WinsView.jsx";
@@ -66,14 +65,15 @@ function TournamentShell() {
   // state, so it isn't part of what exports or syncs.
   const [voiceOn, setVoiceOn] = useState(() => getVoicePref());
 
-  // Toggling on speaks a short confirmation — the tap is exactly the user
-  // gesture iOS wants to unlock audio, and it's the one obvious place this
-  // call needs to live: 5A will later swap the sentence for a sample number.
+  // Toggling on speaks a sample number through the countdown voice — the
+  // tap is exactly the user gesture iOS wants to unlock audio, and it's
+  // the one obvious place this call needs to live: it lets whoever just
+  // switched the voice on hear what it sounds like.
   const toggleVoice = () => {
     const next = !voiceOn;
     setVoicePref(next);
     setVoiceOn(next);
-    if (next) speakResult("Voice on");
+    if (next) speakVoiceSample();
   };
 
   const tabs = [

@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A 1v1 football tournament tracker for garden matches. Eleven game modes,
-per-match timers that tick out the final ten seconds aloud, goal-minute
+per-match timers that count down the final ten seconds aloud, goal-minute
 logging, top-scorer stats, an all-time Wins table, and persistent history —
 installable as a home-screen app and built to keep working on a phone with a
 weak signal.
@@ -129,13 +129,22 @@ works offline after first load.
 ## Audio note
 
 Browsers block sound until the user interacts with the page. The app unlocks
-audio on the first tap, so tap anything once before relying on the 10-second
-warning beep. On iOS, the ringer switch mutes all of this — beeps, chimes,
-and spoken results alike — so turn it on to hear any of it.
+audio on the first tap; the speaker toggle itself is one such tap, and
+flipping it on immediately speaks a sample number so there's nothing to take
+on faith. On iOS, the ringer switch mutes all of this — ticks, chimes, the
+countdown voice, and spoken results alike — so turn it on to hear any of it.
 
-Marking a match played can also say the result out loud (the speaker toggle
-in the hero). It speaks through the browser's own speech engine and only
-ever uses a voice already installed on the device — player names are
+The final ten seconds of a timer count down aloud — "ten", "nine", … "one" —
+in a small robot voice synthesised entirely from an `OscillatorNode`; there
+are no audio files or recordings anywhere in the app. The pitch drops a
+semitone with every number, so the countdown's position comes through from
+pitch alone even for a player facing away from the phone. With the voice
+switched off, or when a second timer is already mid-word, it falls back to
+the plain warning beep.
+
+Marking a match played can also say the result out loud (the same speaker
+toggle in the hero). It speaks through the browser's own speech engine and
+only ever uses a voice already installed on the device — player names are
 children's names, and some platforms offer network-backed voices that would
 send those names off the device to speak them, which this app won't do. If
 no local voice is available, it falls back to a two-note chime instead. The
