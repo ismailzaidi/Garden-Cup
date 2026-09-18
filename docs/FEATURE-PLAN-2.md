@@ -1,13 +1,17 @@
 # Feature plan 2: a 30-second timer, a bigger chaos deck, an all-time Wins tab, a best-of-1 or best-of-3 final, a talking scoreboard
 
-**Status: sections 1 to 4 shipped. Section 5 is planned and awaiting
-review.** Where a built version departs from the original plan, the section
-below says so and why — the descriptions of 1 to 4 match the code as it
-stands. The suite went from 161 tests to 209; `npm run lint` and
-`npm run build` are clean.
+**Status: all five sections built.** Where a built version departs from the
+original plan, the section below says so and why — every description here
+matches the code as it stands. The suite went from 161 tests to 238;
+`npm run lint` and `npm run build` are clean.
+
+**One thing is genuinely unfinished:** section 5A's countdown voice has
+never been heard by a person. Its acceptance bar is a listening test on a
+real phone, and no amount of green CI substitutes for it. See 5A's status
+note.
 
 Sections 1 to 4 were four changes, in the order they should be built.
-Section 5 was added afterwards and has not been built. The first two are small
+Section 5 was added afterwards and built last. The first two are small
 and self-contained. The third adds a shell-level tab — the first new one
 since History — and, in its second step, the first database migration
 since `001_init.sql`. The fourth gives every mode with a final a setup
@@ -654,9 +658,16 @@ switch. Worth doing if wanted; it is its own plan.
 
 ## 5. A talking scoreboard
 
-**Status: planned, not built — awaiting review.** This section was reviewed
-before being finalised; the *Review notes* at the end record what the review
-changed, including one factual claim it corrected.
+**Status: both halves built. One thing is outstanding: nobody has heard it
+yet.** The code is written, tested and green, but the acceptance bar below
+is a listening test, and a listening test cannot be run from a terminal.
+Until someone plays it on a real phone, the voice ships **on by default on
+an untested assumption**. Run the bar before this reaches anyone else, and
+if it misses, flip the default rather than arguing with it.
+
+This section was reviewed before being finalised; the *Review notes* at the
+end record what the review changed, including one factual claim it
+corrected, and what building it changed again.
 
 Two pieces of speech, deliberately built on two different mechanisms:
 
@@ -1154,6 +1165,44 @@ This section was reviewed before being finalised. What the review changed:
   the speaker button speaking on toggle, and the acceptance bar** were all
   added on the review's recommendation.
 
+#### What building it changed again
+
+- **The plan's own code sketch for 5B had a bug.** `resultSentence` was
+  written to be called from `togglePlayed` with the *pre-toggle* match, so a
+  version that checked `match.played` went silent in real use while its unit
+  tests still passed. The module now documents why it must not look at that
+  flag, and a regression test is named for it.
+- **The empty-voice-list case was made stricter than the plan said.** The
+  plan allowed speaking through the engine's default voice while
+  `getVoices()` was still empty. That default may be a network voice, so the
+  build plays the motif for that first call and caches the real list once
+  the browser reports it. The stricter reading wins because the whole point
+  of the rule is that children's names stay on the device.
+- **Word envelopes are two layers, not one.** A single envelope on the
+  master gain cannot make the closure gap in "six" actually silent, so there
+  are per-segment gates feeding a word-level envelope.
+- **Plosive edges reuse the fricative mechanism** at very short durations
+  rather than introducing a fourth segment type. Zero samples still, but the
+  difference between a click and a hiss is cruder than the table implies.
+- **"Seven" is two sequential steady vowels** rather than a glide, because
+  the table gives no path between ɛ and ə.
+
+#### What the builder expects to be wrong on a phone
+
+Recorded here because it was flagged honestly before anyone listened, and it
+is the shortlist to check first when someone does:
+
+- The two-oscillator fricative makes dense inharmonic sidebands, not true
+  broadband noise, and may read as a buzz rather than an "s" on a small
+  speaker.
+- F1 for "two", "three" and "six" sits at 270 to 390 Hz even after scaling,
+  and a phone speaker reproduces almost nothing down there — exactly the
+  risk that put pitch, not vowels, in charge of carrying the count.
+- The 5 ms plosive edges on "ten" and "two" may be too brief to survive a
+  small speaker's transient response.
+
+---
+
 The review also recommended keeping the result announcement deferred. It is
 included here anyway, at the explicit request of the person the app is for.
 The reasoning for deferring it is preserved above in 5B: it needs a second
@@ -1177,12 +1226,11 @@ one place that already knows both the score and the names.
    *Shipped.*
 5. **Wins tab, step B** — migration first, then the API, then the client
    record change. Depends on 4. *Shipped alongside step A.*
-6. **Talking scoreboard** — last, and only after review. It depends on
-   nothing above it, but it is the only item whose result cannot be judged
-   from a test run, so it wants a quiet evening and a real garden rather
-   than a slot in a batch. Build 5B first: it is far smaller, it is the
-   part that cannot fail on a tap, and it gives the speaker button
-   something to do while 5A's vowels are still being tuned.
+6. **Talking scoreboard** — last, and only after review. *Built, 5B then
+   5A, in that order.* It is the only item whose result cannot be judged
+   from a test run, and that half of it remains outstanding: the voice
+   still needs a quiet evening and a real garden before it should be on by
+   default for anyone else.
 
 For each step: `npm run lint`, `npm test`, `npm run build`, then on a
 phone: pick `30s` and hear ten ticks and the beep; deal a 5-player, 2-leg
