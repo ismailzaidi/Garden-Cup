@@ -65,10 +65,9 @@ function TournamentShell() {
   // state, so it isn't part of what exports or syncs.
   const [voiceOn, setVoiceOn] = useState(() => getVoicePref());
 
-  // Toggling on speaks a sample number through the countdown voice — the
-  // tap is exactly the user gesture iOS wants to unlock audio, and it's
-  // the one obvious place this call needs to live: it lets whoever just
-  // switched the voice on hear what it sounds like.
+  // Toggling the voice on lets whoever just switched it on hear a sample of
+  // the same voice used for the countdown, the paused-game reminder, and
+  // the spoken result.
   const toggleVoice = () => {
     const next = !voiceOn;
     setVoicePref(next);

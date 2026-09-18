@@ -2,13 +2,15 @@
 
 **Status: all five sections built.** Where a built version departs from the
 original plan, the section below says so and why — every description here
-matches the code as it stands. The suite went from 161 tests to 238;
+matches the code as it stands. The suite went from 161 tests to 246;
 `npm run lint` and `npm run build` are clean.
 
-**One thing is genuinely unfinished:** section 5A's countdown voice has
-never been heard by a person. Its acceptance bar is a listening test on a
-real phone, and no amount of green CI substitutes for it. See 5A's status
-note.
+**Section 5A was later rebuilt.** Its hand-rolled oscillator voice was
+never heard on a real phone before the countdown was moved onto the same
+browser speech engine as the spoken result, and the oscillator module was
+deleted. 5A below is kept as the historical record of that approach and the
+review it went through; the *Update* at the end of section 5 describes what
+actually ships.
 
 Sections 1 to 4 were four changes, in the order they should be built.
 Section 5 was added afterwards and built last. The first two are small
@@ -658,14 +660,13 @@ switch. Worth doing if wanted; it is its own plan.
 
 ## 5. A talking scoreboard
 
-**Status: both halves built. One thing is outstanding: nobody has heard it
-yet.** The code is written, tested and green, but the acceptance bar below
-is a listening test, and a listening test cannot be run from a terminal.
-Until someone plays it on a real phone, the voice ships **on by default on
-an untested assumption**. Run the bar before this reaches anyone else, and
-if it misses, flip the default rather than arguing with it.
+**Status: built, then partly rebuilt.** 5B ships as described. 5A was built
+as specified, then replaced: the countdown now speaks through the same
+browser speech engine as the result, and the oscillator synthesis was
+deleted. Read 5A for the reasoning and the review it survived, then read the
+*Update* at the end of this section for what ships.
 
-This section was reviewed before being finalised; the *Review notes* at the
+This section was reviewed before being finalised; the *Review notes* near the
 end record what the review changed, including one factual claim it
 corrected, and what building it changed again.
 
@@ -687,6 +688,14 @@ still works if the synthesised voice is switched off.
 ---
 
 ### 5A. The countdown, synthesised with OscillatorNode
+
+> **Superseded — historical record.** The design below was built in full,
+> then removed in favour of the browser's speech engine before anyone heard
+> it; `src/engine/voice.js` no longer exists. It is kept because the
+> reasoning and the review findings are worth having, and because the
+> constraint it was written under (say ten words with an `OscillatorNode`)
+> may come back if the speech route ever disappoints. For what ships, skip
+> to the *Update* at the end of this section.
 
 #### Today
 
@@ -1210,6 +1219,49 @@ mechanism, and it crosses a boundary the mode contract otherwise keeps clean.
 Both points are now handled rather than dodged — the mechanism is named and
 isolated, and the announcement is driven from `useTournament`, which is the
 one place that already knows both the score and the names.
+
+---
+
+### Update: 5A rebuilt on speechSynthesis, and a spoken pause reminder added
+
+The acceptance bar above was never run — nobody heard 5A's oscillator voice
+on a real phone before the owner decided to change course. Rather than tune
+a synthesised voice by ear, the countdown now speaks through the same
+`speechSynthesis` engine as the result (5B), so there is one voice engine
+for everything the app says instead of two. The oscillator module
+(`src/engine/voice.js` and its tests) has been deleted; its formant tables,
+fricative synthesis and the rest of 5A's design above are historical record
+only, not a description of what ships.
+
+What's true now instead:
+
+- **One shared speech primitive.** Local-voice selection and the `speak()`
+  call live in `audio.js`, not `announce.js` — `announce.js` keeps just the
+  sentence-building (`resultSentence`) and imports `speak()`, so there is
+  still exactly one direction of import and no cycle. The local-voice-only
+  rule is unchanged, and now serves two reasons instead of one: privacy for
+  typed-in names, and reliability, since this app must work with no network
+  and a network-backed voice would not.
+- **The countdown** speaks "ten" down to "one" through `speak()`, falling
+  back to the existing 1200 Hz tick when speech can't be confirmed (off,
+  unavailable, or no local voice). `speechSynthesis.cancel()` runs before
+  every utterance, the same rule 5B already used, so seconds never queue.
+- **A new spoken pause reminder.** Pausing a running timer says "Game
+  paused" once immediately, then repeats on a named interval
+  (`PAUSE_REMINDER_INTERVAL_MS` in `useTimers.js`) for as long as it stays
+  paused — players kept asking whether the game had stopped, so a single
+  announcement wasn't enough. Resuming, resetting, changing the duration, or
+  clearing all timers stop the repeat and cancel any in-flight utterance
+  immediately. There is no beep fallback for this one: silence when there's
+  nothing to speak with, not an invented noise.
+- **No iOS-specific priming.** An earlier draft of this change primed the
+  speech engine with a near-silent utterance on `startTimer`, reasoning that
+  the timer-driven interval has no user gesture behind it. The owner
+  decided against tailoring the app to iOS's gesture rules: there is no
+  priming, detection, or retry logic. If a browser declines to speak
+  without a fresh gesture, the countdown's beep fallback and the pause
+  reminder's silence are the accepted result — the same fallbacks used for
+  every other reason speech might be unavailable.
 
 ---
 

@@ -135,22 +135,26 @@ on faith. On iOS, the ringer switch mutes all of this — ticks, chimes, the
 countdown voice, and spoken results alike — so turn it on to hear any of it.
 
 The final ten seconds of a timer count down aloud — "ten", "nine", … "one" —
-in a small robot voice synthesised entirely from an `OscillatorNode`; there
-are no audio files or recordings anywhere in the app. The pitch drops a
-semitone with every number, so the countdown's position comes through from
-pitch alone even for a player facing away from the phone. With the voice
-switched off, or when a second timer is already mid-word, it falls back to
-the plain warning beep.
+through the browser's own speech engine, the same one used for the spoken
+result below. With the voice switched off, or nothing to speak with, it
+falls back to the plain warning beep instead.
 
-Marking a match played can also say the result out loud (the same speaker
-toggle in the hero). It speaks through the browser's own speech engine and
-only ever uses a voice already installed on the device — player names are
-children's names, and some platforms offer network-backed voices that would
-send those names off the device to speak them, which this app won't do. If
-no local voice is available, it falls back to a two-note chime instead. The
-toggle itself (`gardenCup:voice` in `localStorage`) is device-local: it's
-never included in an export and never synced to another device, so it has
-to be set on each device individually.
+Pausing a running timer says "Game paused", and keeps saying it every couple
+of seconds for as long as it stays paused — a single announcement wasn't
+enough to stop players asking whether the game had stopped. Pressing play
+stops it immediately. There's no beep fallback for this one: if there's
+nothing to speak with, it's simply silent rather than an unexplained noise.
+
+Marking a match played can also say the result out loud. All three of these
+— the countdown, the pause reminder, and the result — only ever use a voice
+already installed on the device. Some platforms offer network-backed voices
+instead, which would mean player names (typed in by a family) leaving the
+device to be spoken, and would also simply fail with no network at all,
+which this offline-first app cannot assume it has. If no local voice is
+available, the result falls back to a two-note chime instead. The toggle
+itself (`gardenCup:voice` in `localStorage`) is device-local: it's never
+included in an export and never synced to another device, so it has to be
+set on each device individually.
 
 ## License
 
