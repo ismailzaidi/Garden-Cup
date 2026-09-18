@@ -479,6 +479,81 @@ describe("League + Chaos — full playthrough", () => {
   });
 });
 
+// Fakes just enough of the Web Speech API for speakResult (src/engine/
+// announce.js) to take its speech path rather than falling back to the
+// motif — jsdom implements neither SpeechSynthesis nor
+// SpeechSynthesisUtterance at all, so both are stood up from scratch here,
+// scoped to the tests that need them and torn down straight after so a
+// stray global can't leak into any other test in this file.
+function stubSpeechSynthesis() {
+  const utterances = [];
+  window.SpeechSynthesisUtterance = function FakeUtterance(text) {
+    this.text = text;
+    this.rate = 1;
+    this.voice = null;
+  };
+  window.speechSynthesis = {
+    getVoices: () => [{ name: "Test Voice", lang: "en-US", localService: true }],
+    speak: (utterance) => utterances.push(utterance.text),
+    cancel: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+  return utterances;
+}
+
+function unstubSpeechSynthesis() {
+  delete window.speechSynthesis;
+  delete window.SpeechSynthesisUtterance;
+}
+
+describe("Result speech — marking a match played (5B)", () => {
+  afterEach(unstubSpeechSynthesis);
+
+  it("speaks a sentence naming both players on mark-played, and nothing on un-mark", async () => {
+    const utterances = stubSpeechSynthesis();
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("1"); // legs per pairing
+    clickText("Best of 1"); // the final
+    clickText("GENERATE FIXTURES");
+
+    await screen.findByText(/Fixtures/);
+    const home = homeNameOfFirstCard();
+    const away = home === "Alice" ? "Bob" : "Alice";
+    addGoalForName(home);
+    clickText("Mark played");
+
+    expect(utterances).toHaveLength(1);
+    expect(utterances[0]).toContain(home);
+    expect(utterances[0]).toContain(away);
+
+    // un-marking the same match is silent — the toggle button now reads
+    // "Played" rather than "Mark played" (see MatchCard.jsx), but that text
+    // is ambiguous on its own: FixturesList also has a "Played" filter
+    // button, rendered before any match card, so the toggle is the last one.
+    const playedButtons = screen.getAllByText("Played");
+    fireEvent.click(playedButtons[playedButtons.length - 1]);
+    expect(utterances).toHaveLength(1);
+  });
+
+  it("does not throw when there is no speech engine at all", async () => {
+    render(<App />); // window.speechSynthesis is left unset — the jsdom default
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("1");
+    clickText("Best of 1");
+    clickText("GENERATE FIXTURES");
+
+    await screen.findByText(/Fixtures/);
+    expect(() => {
+      fireEvent.click(screen.getAllByLabelText("Add goal")[0]);
+      clickText("Mark played");
+    }).not.toThrow();
+  });
+});
+
 describe("config persists across mode switches", () => {
   it("keeps legCount selected after switching away and back, matching pre-refactor behaviour", () => {
     render(<App />);

@@ -28,7 +28,7 @@ export function useTimers() {
             if (!beepedRef.current[id]) { beepedRef.current[id] = true; playBeep(); }
           } else if (remaining <= 10 && lastTickRef.current[id] !== remaining) {
             lastTickRef.current[id] = remaining;
-            playCountdownTick();
+            playCountdownTick(remaining);
           }
         });
         return changed ? next : prev;

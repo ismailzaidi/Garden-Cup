@@ -4,6 +4,7 @@ import { computeStandings, computeTopScorers, computeMinuteBuckets } from "./sta
 import { computeWinsTable } from "./wins.js";
 import { migrateState } from "./persistence.js";
 import { playGoalChime } from "./audio.js";
+import { resultSentence, speakResult } from "./announce.js";
 import { useTimers } from "./useTimers.js";
 import { storage } from "../lib/storage.js";
 import { addHistory, deleteHistory, clearHistory as syncClearHistory, REMOTE_UPDATE_EVENT } from "../lib/syncEngine.js";
@@ -133,7 +134,15 @@ export function useTournament() {
     setTab("setup"); setTournamentId(makeId()); setHistorySaved(false);
   };
 
-  const togglePlayed = (id) => setMatches((p) => p.map((m) => (m.id === id ? { ...m, played: !m.played } : m)));
+  // Announces only on the false-to-true transition — un-marking a match, or
+  // re-marking one already played, says nothing. The side effect stays
+  // outside the state updater (same shape as addGoal below), because React
+  // may invoke an updater more than once.
+  const togglePlayed = (id) => {
+    const match = matches.find((m) => m.id === id);
+    if (match && !match.played) speakResult(resultSentence(match, nameOf));
+    setMatches((p) => p.map((m) => (m.id === id ? { ...m, played: !m.played } : m)));
+  };
 
   /* goals */
   const addGoal = (matchId, side) => {

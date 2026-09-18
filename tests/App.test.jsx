@@ -27,4 +27,16 @@ describe("App", () => {
     fireEvent.click(winsTab);
     expect(screen.getByText(/No finished tournaments yet/)).toBeInTheDocument();
   });
+
+  it("has a speaker toggle in the hero, on by default, reachable with no tournament in progress", () => {
+    render(<App />);
+    const speakerBtn = screen.getByRole("button", { name: /voice/i });
+    expect(speakerBtn).toHaveAttribute("aria-pressed", "true");
+
+    fireEvent.click(speakerBtn);
+    expect(speakerBtn).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(speakerBtn);
+    expect(speakerBtn).toHaveAttribute("aria-pressed", "true");
+  });
 });
