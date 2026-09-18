@@ -17,7 +17,7 @@ describe("dealTwists", () => {
     expect(dealTwists(8, seededRng(7))).toEqual(dealTwists(8, seededRng(7)));
   });
 
-  it("never repeats a twist within the first ten matches", () => {
+  it("never repeats a twist within one pass through the deck", () => {
     const dealt = dealTwists(TWISTS.length, seededRng(11));
     expect(new Set(dealt).size).toBe(TWISTS.length);
   });
@@ -41,6 +41,46 @@ describe("chaos.createFixtures", () => {
     const { matches } = chaos.createFixtures({ players: players(3), config: { chaosLegs: 2 }, rng: seededRng(5) });
     expect(matches.filter((m) => m.leg === 1)).toHaveLength(3);
     expect(matches.filter((m) => m.leg === 2)).toHaveLength(3);
+  });
+
+  it("deals 20 distinct twists across a 5-player, 2-leg Chaos Cup", () => {
+    const { matches } = chaos.createFixtures({ players: players(5), config: { chaosLegs: 2 }, rng: seededRng(9) });
+    expect(matches).toHaveLength(20); // 5 players, two legs: 10 per leg
+    expect(new Set(matches.map((m) => m.twist)).size).toBe(20);
+  });
+});
+
+describe("the twist deck", () => {
+  it("has grown to at least 30 twists", () => {
+    expect(TWISTS.length).toBeGreaterThanOrEqual(30);
+  });
+
+  it("has unique keys, labels and emoji", () => {
+    expect(new Set(TWISTS.map((t) => t.key)).size).toBe(TWISTS.length);
+    expect(new Set(TWISTS.map((t) => t.label)).size).toBe(TWISTS.length);
+    expect(new Set(TWISTS.map((t) => t.emoji)).size).toBe(TWISTS.length);
+  });
+
+  it("keeps every label short enough for TwistBanner and every detail non-empty", () => {
+    expect(TWISTS.every((t) => t.label.length <= 22)).toBe(true);
+    expect(TWISTS.every((t) => t.detail.length > 0)).toBe(true);
+  });
+
+  it("keeps the original ten keys untouched", () => {
+    const original = [
+      "weak-foot",
+      "one-touch",
+      "sitting-keeper",
+      "silent",
+      "slow-mo",
+      "swap-ends",
+      "long-range",
+      "hop-start",
+      "no-looking",
+      "commentator",
+    ];
+    const keys = new Set(TWISTS.map((t) => t.key));
+    original.forEach((key) => expect(keys.has(key)).toBe(true));
   });
 });
 
