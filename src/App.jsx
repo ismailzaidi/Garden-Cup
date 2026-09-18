@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
-import { RotateCcw, Download, Upload, LogOut } from "lucide-react";
+import { RotateCcw, Download, Upload, LogOut, Volume2, VolumeX } from "lucide-react";
 import { C } from "./lib/theme.js";
 import { useTournament } from "./engine/useTournament.js";
+import { getVoicePref, setVoicePref } from "./engine/audio.js";
+import { speakResult } from "./engine/announce.js";
 import SetupView from "./views/SetupView.jsx";
 import StatsView from "./views/StatsView.jsx";
 import WinsView from "./views/WinsView.jsx";
@@ -59,6 +61,20 @@ function TournamentShell() {
   const { importPrompt, confirmImport, dismissImport } = useCloudReconciliation(mode, user);
   const fileInputRef = useRef(null);
   const [importError, setImportError] = useState("");
+  // Device-local, like the preference it reflects (see getVoicePref in
+  // engine/audio.js) — read once at mount, never carried in useTournament's
+  // state, so it isn't part of what exports or syncs.
+  const [voiceOn, setVoiceOn] = useState(() => getVoicePref());
+
+  // Toggling on speaks a short confirmation — the tap is exactly the user
+  // gesture iOS wants to unlock audio, and it's the one obvious place this
+  // call needs to live: 5A will later swap the sentence for a sample number.
+  const toggleVoice = () => {
+    const next = !voiceOn;
+    setVoicePref(next);
+    setVoiceOn(next);
+    if (next) speakResult("Voice on");
+  };
 
   const tabs = [
     { key: "setup", label: "Players" },
@@ -114,6 +130,10 @@ function TournamentShell() {
           )}
           {mode === "cloud" && <SyncIndicator />}
           <div className="flex items-center gap-1.5 ml-auto">
+            <button onClick={toggleVoice} title={voiceOn ? "Turn voice off" : "Turn voice on"}
+              aria-label={voiceOn ? "Turn voice off" : "Turn voice on"} aria-pressed={voiceOn} style={pillIconBtn}>
+              {voiceOn ? <Volume2 size={12} color="#F7F5EE" /> : <VolumeX size={12} color="#F7F5EE" />}
+            </button>
             <button onClick={exportData} title="Export data" style={pillIconBtn}>
               <Download size={12} color="#F7F5EE" />
             </button>

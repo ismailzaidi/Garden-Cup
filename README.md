@@ -130,7 +130,18 @@ works offline after first load.
 
 Browsers block sound until the user interacts with the page. The app unlocks
 audio on the first tap, so tap anything once before relying on the 10-second
-warning beep.
+warning beep. On iOS, the ringer switch mutes all of this — beeps, chimes,
+and spoken results alike — so turn it on to hear any of it.
+
+Marking a match played can also say the result out loud (the speaker toggle
+in the hero). It speaks through the browser's own speech engine and only
+ever uses a voice already installed on the device — player names are
+children's names, and some platforms offer network-backed voices that would
+send those names off the device to speak them, which this app won't do. If
+no local voice is available, it falls back to a two-note chime instead. The
+toggle itself (`gardenCup:voice` in `localStorage`) is device-local: it's
+never included in an export and never synced to another device, so it has
+to be set on each device individually.
 
 ## License
 
