@@ -12,7 +12,7 @@ import { speak, playResultCue } from "./audio.js";
 
 // Winner-first would be one line here — {loser} and {winner} are the only
 // two things this template ever touches.
-const RESULT_TEMPLATE = "{loser} lost HAHAHAHAHA, {winner} won, THE CROWD GOES WILD, YOU ARE THE CHAMPION, MY FRIEND, AND YOU'LL KEEP ON FIGHTING TILL THE END, YOU ARE THE CHAMPION, YOU ARE THE CHAMPION, NO TIME FOR LOSERS, 'CAUSE YOU ARE THE CHAMPION OF THE WORLD!";
+const RESULT_TEMPLATE = "{loser} lost HAHAHAHA, DON'T GIVE UP, {winner} won, THE CHAMPIION, DOMINATE YOUR NEXT OPPONENT";
 
 /* null means "not a result": a bye, or a match missing either player (by
    id, or because nameOf can't resolve one). A draw is still a result, so it
