@@ -166,6 +166,12 @@ redefining them:
 - `engine/twists.js` — `TWISTS`, `dealTwists`, `twistOf`, the deck of silly
   real-world rules shared by `chaos` and `leaguechaos`. A twist must never
   change how a goal counts, or the generic standings stop being valid.
+- `engine/horror.js` — the `horror` mode's separate deck of 100 sealed rules.
+  Unlike a twist, a horror rule's `fate` *does* change points (the winner
+  loses, both lose, points drained…). Fates are applied only by
+  `computeHorrorStandings`, which only the horror mode calls; the shared
+  `standings` prop and the Stats tab stay honest. The `twists.js` rule above
+  still stands for every other mode.
 - `engine/bracket.js` — `generateKnockoutRound1`, `latestRoundState`,
   `bracketChampion`, and `advanceBracket`, the single-elimination machinery
   shared by `knockout` and `penalties`. `advanceBracket` takes the stage to

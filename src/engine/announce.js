@@ -10,9 +10,18 @@
  */
 import { speak, playResultCue } from "./audio.js";
 
-// Winner-first would be one line here — {loser} and {winner} are the only
-// two things this template ever touches.
-const RESULT_TEMPLATE = "{loser} lost HAHAHAHA, DON'T GIVE UP, {winner} won, THE CHAMPIION, DOMINATE YOUR NEXT OPPONENT";
+// One is picked at random per result so the announcer doesn't repeat itself.
+// Kids play this, so keep them gross-out silly, never mean, and end on good
+// sportsmanship. Each must use {loser} and {winner} exactly once.
+export const RESULT_TEMPLATES = [
+  "Ewww, {loser} got slimed! {winner} wins it! Good game, both of you!",
+  "Yuck! {loser} stepped in the mud! {winner} takes the win! High fives all round!",
+  "Ew, ew, ew! {loser} got covered in bogeys! {winner} wins! Great game!",
+  "Splat! {loser} fell in a puddle of goo! {winner} is the winner! Shake hands, superstars!",
+  "Pee-yew! {loser} got hit by a stinky sock! {winner} wins it! Brilliant effort, both of you!",
+  "Oh no, {loser} got gunged! {winner} wins! Well played, everyone!",
+  "Eww, slug slime everywhere! {loser} slipped up and {winner} wins it! Good game!",
+];
 
 /* null means "not a result": a bye, or a match missing either player (by
    id, or because nameOf can't resolve one). A draw is still a result, so it
@@ -21,8 +30,9 @@ const RESULT_TEMPLATE = "{loser} lost HAHAHAHA, DON'T GIVE UP, {winner} won, THE
    Deliberately does not look at match.played: useTournament's togglePlayed
    calls this with the pre-toggle match, at the instant it's about to flip
    false -> true, so played is still false on the object passed in here.
-   Whether this is a real result is the caller's call, not this one's. */
-export function resultSentence(match, nameOf) {
+   Whether this is a real result is the caller's call, not this one's.
+   `rng` picks the template; tests pass a fixed one. */
+export function resultSentence(match, nameOf, rng = Math.random) {
   if (!match || match.bye) return null;
   if (!match.p1 || !match.p2) return null;
 
@@ -36,7 +46,8 @@ export function resultSentence(match, nameOf) {
   const loser = nameOf(loserId);
   if (!winner || !loser) return null;
 
-  return RESULT_TEMPLATE.replace("{loser}", loser).replace("{winner}", winner);
+  const template = RESULT_TEMPLATES[Math.floor(rng() * RESULT_TEMPLATES.length)];
+  return template.replace("{loser}", loser).replace("{winner}", winner);
 }
 
 /* Speaks `sentence` through a local voice, or plays the two-note motif

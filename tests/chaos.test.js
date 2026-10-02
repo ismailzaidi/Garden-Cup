@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import chaos from "../src/modes/chaos.jsx";
-import { TWISTS, dealTwists, twistOf } from "../src/engine/twists.js";
+import { TWISTS, RETIRED_TWISTS, dealTwists, twistOf } from "../src/engine/twists.js";
 
 function seededRng(seed) {
   let s = seed;
@@ -66,7 +66,7 @@ describe("the twist deck", () => {
     expect(TWISTS.every((t) => t.detail.length > 0)).toBe(true);
   });
 
-  it("keeps the original ten keys untouched", () => {
+  it("keeps the original ten keys resolvable, live or retired", () => {
     const original = [
       "weak-foot",
       "one-touch",
@@ -79,8 +79,13 @@ describe("the twist deck", () => {
       "no-looking",
       "commentator",
     ];
-    const keys = new Set(TWISTS.map((t) => t.key));
-    original.forEach((key) => expect(keys.has(key)).toBe(true));
+    original.forEach((key) => expect(twistOf(key)?.key).toBe(key));
+  });
+
+  it("never deals a retired twist, and never lists a key as both live and retired", () => {
+    const retired = new Set(RETIRED_TWISTS.map((t) => t.key));
+    expect(TWISTS.some((t) => retired.has(t.key))).toBe(false);
+    expect(dealTwists(TWISTS.length * 3, seededRng(17)).some((k) => retired.has(k))).toBe(false);
   });
 });
 
