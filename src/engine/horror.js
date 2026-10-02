@@ -5,9 +5,11 @@
  * only the horror mode calls it — the generic standings (and the Stats tab)
  * still see the honest on-pitch result.
  *
- * Every rule is sealed: the referee peeks at it, the players don't. A rule
- * with fate "normal" is a real-world curse the referee reads out at kick-off;
- * any other fate is kept secret and rewrites the result at full time.
+ * Rules come in two kinds, decided by `fate` (see isSecret):
+ *  - SECRET (any fate but "normal"): referee only. Sealed behind a
+ *    hold-to-peek button, revealed at full time, and it rewrites the result.
+ *  - OPEN (fate "normal"): everyone knows. Shown on the card from the start,
+ *    because the players have to act it out.
  *
  * Every rule must be child-friendly: spooky and silly, never mean. No
  * roasts, insults, shame or humiliation forfeits, devils, souls, blood or
@@ -31,7 +33,11 @@ export const FATE_VERDICT = {
   drain: "🧛 The winner drained 3 points out of the loser.",
 };
 
+/* SECRET rules come first in the deck, OPEN rules after — purely for
+   reading; dealing shuffles the whole deck. */
 export const HORROR_TWISTS = [
+  // ════════ SECRET — referee only, rewrites the result ════════
+
   // ── Cursed results: the winner loses ──
   { key: "upside-down", emoji: "🙃", fate: "reverse", label: "Upside Down", detail: "Whoever wins this match actually loses. Whoever loses, wins. Tell nobody until full time." },
   { key: "cursed-crown", emoji: "👑", fate: "reverse", label: "Cursed Crown", detail: "The crown is cursed. The winner takes the defeat; the loser walks off with the points." },
@@ -84,6 +90,9 @@ export const HORROR_TWISTS = [
   { key: "grim-tax", emoji: "🧌", fate: "drain", label: "Troll Toll", detail: "A troll guards the bridge and charges the loser a toll: minus 3 points. The winner keeps their 3." },
   { key: "ghost-pickpocket", emoji: "🦝", fate: "drain", label: "Ghost Pickpocket", detail: "A ghost pickpockets 3 points off the loser and hands them to the winner." },
   { key: "black-hole", emoji: "🕳️", fate: "drain", label: "Black Hole", detail: "The loser falls into a black hole and comes out 3 points poorer." },
+
+
+  // ════════ OPEN — everyone knows, act it out ════════
 
   // ── Haunted keeper ──
   { key: "possessed-keeper", emoji: "😵‍💫", fate: "normal", label: "Possessed Keeper", detail: "Keepers are possessed: arms stiff by their sides like a creepy doll." },
@@ -158,6 +167,9 @@ export const HORROR_TWISTS = [
   { key: "draw-four", emoji: "🃏", fate: "normal", label: "Draw Four", detail: "Concede and do four of whatever the scorer picks: star jumps, spins or squats." },
   { key: "skipped", emoji: "⏭️", fate: "normal", label: "Skipped", detail: "Once each per match, shout SKIP: your opponent must stand still for the next kick-off." },
 ];
+/* true: referee only, sealed until full time. false: shown to everyone. */
+export const isSecret = (twist) => twist.fate !== "normal";
+
 export const horrorOf = (key) => HORROR_TWISTS.find((t) => t.key === key) ?? null;
 
 /* Same as dealTwists: no repeats until the deck runs dry, then reshuffle. */

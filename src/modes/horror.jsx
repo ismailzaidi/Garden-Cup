@@ -79,8 +79,9 @@ export default {
     const matchCount = (players.length * (players.length - 1) * legCount) / 2;
     return (
       <>
-        <b style={{ color: C.ink }}>{matchCount} matches</b>, each one dealt a sealed rule only the referee can see.
-        Some are curses read out at kick-off; others stay secret and <b style={{ color: C.ink }}>rewrite the result at full time</b> —
+        <b style={{ color: C.ink }}>{matchCount} matches</b>, each one dealt a spooky rule. <b style={{ color: C.ink }}>Open</b> rules
+        are shown to everyone to act out. <b style={{ color: C.ink }}>Secret</b> rules are sealed — only the referee can peek — and
+        they <b style={{ color: C.ink }}>rewrite the result at full time</b>:
         the winner might lose, nobody might score a point, or the loser might be drained dry.
       </>
     );

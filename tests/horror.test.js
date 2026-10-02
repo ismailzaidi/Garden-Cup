@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import horror from "../src/modes/horror.jsx";
-import { HORROR_TWISTS, FATES, FATE_VERDICT, dealHorrors, horrorOf, fateOutcome, computeHorrorStandings } from "../src/engine/horror.js";
+import { HORROR_TWISTS, FATES, FATE_VERDICT, isSecret, dealHorrors, horrorOf, fateOutcome, computeHorrorStandings } from "../src/engine/horror.js";
 
 function seededRng(seed) {
   let s = seed;
@@ -41,6 +41,15 @@ describe("the horror deck", () => {
     ];
     const offenders = texts.filter((s) => banned.test(s));
     expect(offenders).toEqual([]);
+  });
+
+  it("splits into secret rules (change the result) and open rules (everyone acts them out)", () => {
+    const secret = HORROR_TWISTS.filter(isSecret);
+    const open = HORROR_TWISTS.filter((t) => !isSecret(t));
+    expect(secret).toHaveLength(39);
+    expect(open).toHaveLength(61);
+    expect(secret.every((t) => t.fate !== "normal" && FATE_VERDICT[t.fate])).toBe(true);
+    expect(open.every((t) => t.fate === "normal")).toBe(true);
   });
 
   it("every rule has an emoji, label and detail", () => {
