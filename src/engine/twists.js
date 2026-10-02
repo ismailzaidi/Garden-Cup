@@ -7,7 +7,8 @@
  * app — a twist must never change how a goal counts, or the generic standings
  * stop being valid for the modes that deal them.
  *
- * Append only; never rename or remove a key. `m.twist` stores a twist's key
+ * Never rename or delete a key: to drop a twist from the deck, move it to
+ * RETIRED_TWISTS at the bottom of this file. `m.twist` stores a twist's key
  * on every chaos match in localStorage (and in cloud saves), and `twistOf`
  * returns null for an unknown key — renaming or deleting one silently makes
  * the banner vanish from every saved tournament that dealt it. New twists
@@ -53,7 +54,7 @@ export const TWISTS = [
   { key: "worm-burner", emoji: "🐛", label: "Worm burners", detail: "Ground shots only. If the ball leaves the floor, no goal." },
   { key: "rainbow", emoji: "🌈", label: "Rainbow shots", detail: "The ball must go above waist height before it crosses the line." },
   { key: "spoon-chip", emoji: "🥄", label: "Spoon chips", detail: "Only chipped shots, scooped under the ball, count." },
-  { key: "curl-it", emoji: "🌀", label: "Curl it", detail: "Shots must curve. Set up wide and bend it in." },
+  { key: "curl-it", emoji: "🍌", label: "Curl it", detail: "Shots must curve. Set up wide and bend it in." },
   { key: "volley", emoji: "🌩️", label: "Volley or bust", detail: "The ball must be in the air when you strike it, or the goal doesn't count." },
   { key: "bounce-goal", emoji: "🏀", label: "Bounce goal", detail: "The ball has to bounce once before crossing the line." },
   { key: "big-head", emoji: "🧠", label: "Big head", detail: "Headers are worth double. Everything else is worth one." },
@@ -101,7 +102,91 @@ export const TWISTS = [
   { key: "lucky-ritual", emoji: "🍀", label: "Lucky ritual", detail: "Invent a lucky ritual and do it before every shot. Forget it and the shot is void." },
   { key: "accessory-stack", emoji: "🧣", label: "Accessory stack", detail: "Every time you score, add a silly item to wear: scarf, sock on hand, hat." },
 ];
-export const twistOf = (key) => TWISTS.find((t) => t.key === key) ?? null;
+
+/* Twists taken out of the deck. They are never dealt again, but saved
+   tournaments still hold their keys on old matches, so twistOf keeps
+   resolving them and those matches keep their banner. Retire a twist by
+   moving it here, never by deleting it. */
+export const RETIRED_TWISTS = [
+  { key: "silent", emoji: "🤫", label: "Silent match", detail: "Talk or celebrate out loud and the goal doesn't count." },
+  { key: "slow-mo", emoji: "🐢", label: "Slow-mo celebrations", detail: "Every goal gets a slow-motion replay celebration." },
+  { key: "hop-start", emoji: "🐸", label: "Hop start", detail: "Restart hopping on one leg until you touch the ball." },
+  { key: "no-looking", emoji: "🙈", label: "No looking", detail: "The taker looks away as they shoot — the keeper picks when." },
+  { key: "trex-arms", emoji: "🦖", label: "T-rex arms", detail: "Elbows pinned to your sides all match. Tiny arms only." },
+  { key: "penguin", emoji: "🐧", label: "Penguin feet", detail: "Heels together, waddle everywhere." },
+  { key: "spin-start", emoji: "🌀", label: "Dizzy kick-off", detail: "Spin round three times before every kick-off." },
+  { key: "toe-poke", emoji: "👟", label: "Toe pokes only", detail: "Every shot is a toe poke. No laces, no side-foot." },
+  { key: "tiny-goals", emoji: "🥅", label: "Tiny goals", detail: "A cone in each goal halves it — both ends, all match." },
+  { key: "quiz-goal", emoji: "🧮", label: "Quiz goal", detail: "Before a goal counts, answer a quiz question from your opponent. Get it wrong and play on." },
+  { key: "sound-effects", emoji: "🎺", label: "Sound effects", detail: "Make your own sound effect for every kick, save and goal." },
+  { key: "superhero", emoji: "🦸", label: "Superhero names", detail: "Pick a superhero name each and answer to nothing else." },
+  { key: "singing", emoji: "🎤", label: "Singing dribbler", detail: "Sing while you have the ball. Stop singing and you lose it." },
+  { key: "crab-walk", emoji: "🦀", label: "Crab walk", detail: "Sideways shuffles only. Step forwards or backwards and it's a foul." },
+  { key: "kangaroo", emoji: "🦘", label: "Kangaroo", detail: "Feet together, bounce everywhere. No normal steps allowed." },
+  { key: "zombie", emoji: "🧟", label: "Zombie match", detail: "Arms out front, stiff legs, groan every time you touch the ball." },
+  { key: "robot", emoji: "🤖", label: "Robot mode", detail: "Move and talk like a robot. Bend a knee normally and you power down for three seconds." },
+  { key: "ballerina", emoji: "🩰", label: "Ballerina", detail: "Tiptoes all match. Heels touch the ground and it's a free ball." },
+  { key: "moonwalk", emoji: "🔙", label: "Moonwalk", detail: "Move backwards only. Turn round and it's your opponent's ball." },
+  { key: "ice-skater", emoji: "⛸️", label: "Ice skater", detail: "Feet never leave the ground. Slide and shuffle everywhere." },
+  { key: "gorilla", emoji: "🦍", label: "Gorilla walk", detail: "Bent over, arms swinging low, chest-thump after every touch." },
+  { key: "tightrope", emoji: "🎪", label: "Tightrope", detail: "Every step must be heel-to-toe, like walking a wire. Break the line and it's a foul." },
+  { key: "hot-lava", emoji: "🌋", label: "Hot lava", detail: "Stand on one spot for more than two seconds and your opponent gets a free shot." },
+  { key: "giraffe", emoji: "🦒", label: "Giraffe", detail: "Giant strides only. Big long steps, no little ones." },
+  { key: "grandpa", emoji: "👴", label: "Grandpa match", detail: "Hunched back, slow shuffle, and complain about your knees after every run." },
+  { key: "cyclops", emoji: "👁️", label: "Cyclops", detail: "One eye closed all match. Open both and you give away the ball." },
+  { key: "hand-on-head", emoji: "💆", label: "Hand on head", detail: "One hand stays on top of your head the whole match." },
+  { key: "pocket-hands", emoji: "🧥", label: "Pocket hands", detail: "Hands in pockets or tucked in your waistband. Keepers too — feet only." },
+  { key: "elephant", emoji: "🐘", label: "Elephant trunk", detail: "Hold your nose with one hand and swing that arm like a trunk. Trumpet after every goal." },
+  { key: "wobbly-legs", emoji: "🍮", label: "Jelly legs", detail: "Knees bent and wobbling at all times. Stand still and stiff and it's a foul." },
+  { key: "gnome", emoji: "🍄", label: "Garden gnome", detail: "Stay in a deep crouch and waddle. Stand up straight and you lose the ball." },
+  { key: "tree", emoji: "🌳", label: "Tree mode", detail: "Both arms up like branches all match. Lower them and it's a free kick." },
+  { key: "bear-keeper", emoji: "🐻", label: "Bear keeper", detail: "Keepers stay on hands and feet like a bear. Growl on every save." },
+  { key: "umbrella-keeper", emoji: "☂️", label: "Umbrella keeper", detail: "Keepers must hold an open umbrella and can only save with it." },
+  { key: "cone-hands", emoji: "🔺", label: "Cone hands", detail: "Keepers hold a cone in each hand. Drop one and it's a goal." },
+  { key: "bat-keeper", emoji: "🏏", label: "Bat keeper", detail: "Keepers defend with a cricket bat or rolled-up newspaper. No hands allowed." },
+  { key: "rocket", emoji: "🚀", label: "Rocket launch", detail: "Count down 3-2-1 blast-off before every shot." },
+  { key: "hula-hoop", emoji: "⭕", label: "Hula goal", detail: "Prop a hoop in the goal. Only shots through the hoop count." },
+  { key: "bottle-topple", emoji: "🍾", label: "Bottle topple", detail: "Balance a bottle on the goal. Knock it off with a shot for a bonus goal." },
+  { key: "cone-slalom", emoji: "🚧", label: "Slalom first", detail: "Dribble around a cone before every shot. Miss the cone and it doesn't count." },
+  { key: "shades", emoji: "🕶️", label: "Cool shades", detail: "Pretend to put on sunglasses before each shot. Forget and the goal doesn't count." },
+  { key: "bowling", emoji: "🎳", label: "Bowling shots", detail: "Shots are underarm rolls, like bowling. Feet are for dribbling only." },
+  { key: "woodwork", emoji: "🪵", label: "Woodwork wizard", detail: "The ball must hit a post or crossbar before it goes in, or it doesn't count." },
+  { key: "handball-hero", emoji: "🤾", label: "Handball hero", detail: "Once per match, pick up the ball and throw it at goal. It counts." },
+  { key: "score-swap", emoji: "🔃", label: "Score swap", detail: "After every third goal, swap scores with your opponent." },
+  { key: "rps-restart", emoji: "✂️", label: "RPS kick-off", detail: "After every goal, rock-paper-scissors decides who gets the ball." },
+  { key: "handicap-hat", emoji: "🧢", label: "Handicap hat", detail: "Whoever's winning wears a cap and must keep one hand on it." },
+  { key: "keep-rolling", emoji: "🛼", label: "Keep it rolling", detail: "The ball can never stop. If it stops, the other player wins it." },
+  { key: "shoe-throw-restart", emoji: "🥾", label: "Shoe-throw restart", detail: "After every goal, throw a shoe. Wherever it lands is where play restarts." },
+  { key: "shoe-swap", emoji: "🥿", label: "Shoe swap", detail: "At half-time, swap shoes with your opponent and play on." },
+  { key: "balloon", emoji: "🎈", label: "Balloon ball", detail: "Play with a balloon or beach ball instead of the football." },
+  { key: "sock-ball", emoji: "🧦", label: "Sock ball", detail: "Play with a rolled-up sock ball. Good luck with that." },
+  { key: "tennis-ball", emoji: "🎾", label: "Tennis ball switch", detail: "Halfway through, swap to a tennis ball. Everything gets trickier." },
+  { key: "shoe-mines", emoji: "👞", label: "Shoe mines", detail: "Put two shoes on the pitch. Touch one with the ball and your opponent gets it." },
+  { key: "pirate", emoji: "🏴‍☠️", label: "Pirate match", detail: "Talk like a pirate. Goals are \"treasure\"." },
+  { key: "wizard", emoji: "🪄", label: "Wizard duel", detail: "Wave an arm and cast a made-up spell before every shot." },
+  { key: "mouse", emoji: "🐭", label: "Squeaky mouse", detail: "Every word you say must be in a squeaky mouse voice." },
+  { key: "interview", emoji: "🎙️", label: "Post-goal interview", detail: "After every goal, the loser interviews the scorer with three questions." },
+  { key: "cowboy", emoji: "🤠", label: "Cowboy match", detail: "Say \"yeehaw\" after every shot and talk like it's the Wild West." },
+  { key: "alien", emoji: "👽", label: "Alien language", detail: "Speak only in made-up alien gibberish." },
+  { key: "cooking-show", emoji: "🍳", label: "Cooking show", detail: "Describe every move like a recipe: \"Add one pinch of dribble...\"" },
+  { key: "animal-noises", emoji: "🐄", label: "Animal noises", detail: "Pick an animal each. You can only communicate in its noises." },
+  { key: "villain", emoji: "🦹", label: "Evil villain", detail: "Do an evil laugh after every goal and monologue about your plan." },
+  { key: "nature-doc", emoji: "🎬", label: "Nature documentary", detail: "Whisper-narrate the match like a wildlife documentary." },
+  { key: "shakespeare", emoji: "📜", label: "Shakespeare", detail: "Speak in old-fashioned English. \"Thou shalt not pass!\"" },
+  { key: "ref-cards", emoji: "🟨", label: "Card-happy ref", detail: "Wave imaginary yellow and red cards for anything silly." },
+  { key: "drama-queen", emoji: "😭", label: "Drama queen", detail: "Whoever concedes must cry dramatically for five seconds." },
+  { key: "diving", emoji: "🏊", label: "Diving contest", detail: "Every tackle needs a dramatic dive. Best acting wins the ball." },
+  { key: "comedian", emoji: "😂", label: "Comedian", detail: "Tell a joke before each shot. If the keeper laughs, the goal counts double." },
+  { key: "alphabet", emoji: "🔤", label: "Alphabet shots", detail: "Before you shoot, name something starting with the next letter of the alphabet." },
+  { key: "category", emoji: "🍕", label: "Name three", detail: "Before you shoot, name three of something the keeper picks: animals, foods, countries." },
+  { key: "tongue-twister", emoji: "👅", label: "Tongue twister", detail: "Say a tongue twister before each shot. Mess it up and the goal doesn't count." },
+  { key: "acrobat", emoji: "🤸", label: "Acrobat", detail: "Do a forward roll or cartwheel after every goal, before the restart." },
+  { key: "mirror", emoji: "🪞", label: "Mirror mirror", detail: "Defenders must copy the attacker's arm movements." },
+  { key: "polite-steal", emoji: "🙏", label: "Polite steal", detail: "Say \"please\" to tackle and \"thank you\" afterwards, or it's a foul." },
+  { key: "invisible-ball", emoji: "👻", label: "Invisible ball", detail: "Play one minute with an imaginary ball. Argue about goals and settle with rock-paper-scissors." },
+];
+
+export const twistOf = (key) => TWISTS.find((t) => t.key === key) ?? RETIRED_TWISTS.find((t) => t.key === key) ?? null;
 
 /* Deal without repeats until the deck runs dry, then reshuffle — so a
    tournament of ten or fewer matches never sees the same twist twice. */
