@@ -58,20 +58,4 @@ describe("New / reset", () => {
     expect(saved.players.map((p) => p.name)).toEqual(["Alice", "Bob"]);
     expect(saved.matches).toEqual([]);
   }, 4000);
-
-  it("blocks generating fixtures once a kept roster exceeds a mode's player cap", async () => {
-    render(<App />);
-    addPlayer("Alice");
-    addPlayer("Bob");
-    addPlayer("Cara");
-    clickText("1");
-    clickText("GENERATE FIXTURES");
-    await screen.findByText(/Fixtures/);
-
-    clickText("New");
-    clickText("Best of N"); // capped at 2 players; 3 are kept from before
-
-    expect(screen.getByText(/This mode needs exactly 2 players — remove 1 to start/)).toBeInTheDocument();
-    expect(screen.getByText("GENERATE LEGS")).toBeDisabled();
-  });
 });

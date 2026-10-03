@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { makeId } from "./match.js";
-import { computeStandings, computeTopScorers, computeMinuteBuckets } from "./standings.js";
+import { computeStandings, computeTopScorers, computeMinuteBuckets, computeCardCounts } from "./standings.js";
 import { computeWinsTable } from "./wins.js";
-import { migrateState } from "./persistence.js";
+import { migrateState, retireMode } from "./persistence.js";
 import { playGoalChime, playWhistle, speak } from "./audio.js";
-import { applyCard, cardSentence, CARD_GOAL_OFF } from "./cards.js";
+import { applyCard, applyRedCard, undoRedCard as takeBackRed, cardSentence, redCardSentence, CARD_GOAL_OFF } from "./cards.js";
 import { teamsOf } from "./teams.js";
 import { lastPlaceOf } from "./stakes.js";
 import { resultSentence, speakResult } from "./announce.js";
@@ -48,7 +48,7 @@ export function useTournament() {
      or the initial cloud reconciliation in App.jsx both dispatch
      REMOTE_UPDATE_EVENT rather than duplicate this) */
   const applyCurrentState = (raw) => {
-    const d = migrateState(raw);
+    const d = retireMode(migrateState(raw), MODES.map((m) => m.key));
     if (!d) return;
     setPlayers(d.players || []);
     setMatches(d.matches || []);
@@ -190,10 +190,22 @@ export function useTournament() {
     setMatches((prev) => prev.map((m) => (m.id === matchId ? { ...m, [side]: String(Math.max(0, Number(m[side] || 0) - 1)) } : m)));
   };
 
-  /* the slow-play card — see engine/cards.js. A goal taken off leaves the
-     goals log too (the player's most recent one in this match, as undoGoal
-     does), so Stats agrees with the score; a goal handed to the opponent is
-     never logged, because nobody scored it. */
+  /* drops a player's `count` most recent goals in a match from the goals
+     log — what a card that takes goals off does, so Stats agrees with the
+     score. A goal a card hands to the opponent is never logged at all,
+     because nobody scored it. */
+  const dropLoggedGoals = (matchId, pid, count) => {
+    if (count <= 0) return;
+    setGoals((prev) => {
+      const drop = new Set();
+      for (let i = prev.length - 1; i >= 0 && drop.size < count; i--) {
+        if (prev[i].matchId === matchId && prev[i].playerId === pid) drop.add(i);
+      }
+      return drop.size ? prev.filter((_, i) => !drop.has(i)) : prev;
+    });
+  };
+
+  /* the slow-play card — see engine/cards.js */
   const giveCard = (matchId, side) => {
     const match = matches.find((m) => m.id === matchId);
     if (!match || match.bye || !match.p1 || !match.p2) return;
@@ -201,14 +213,25 @@ export function useTournament() {
     const opponentId = side === "s1" ? match.p2 : match.p1;
     const { match: carded, effect } = applyCard(match, side);
     if (!speak(cardSentence(effect, nameOf(pid), nameOf(opponentId)), 1.05)) playWhistle();
-    if (effect === CARD_GOAL_OFF) {
-      setGoals((prev) => {
-        let last = -1;
-        for (let i = prev.length - 1; i >= 0; i--) if (prev[i].matchId === matchId && prev[i].playerId === pid) { last = i; break; }
-        return last === -1 ? prev : prev.filter((_, i) => i !== last);
-      });
-    }
+    dropLoggedGoals(matchId, pid, effect === CARD_GOAL_OFF ? 1 : 0);
     setMatches((prev) => prev.map((m) => (m.id === matchId ? carded : m)));
+  };
+
+  /* the red card — points off in the table, or goals off in a stage the
+     mode lists under `goalStages` because it has no table to dock */
+  const giveRedCard = (matchId, side) => {
+    const match = matches.find((m) => m.id === matchId);
+    if (!match || match.bye || !match.p1 || !match.p2) return;
+    const pid = side === "s1" ? match.p1 : match.p2;
+    const costsGoals = (activeMode.goalStages || []).includes(match.stage);
+    const { match: carded, goalsOff } = applyRedCard(match, side, costsGoals);
+    if (!speak(redCardSentence(nameOf(pid), costsGoals), 1.05)) playWhistle();
+    dropLoggedGoals(matchId, pid, goalsOff);
+    setMatches((prev) => prev.map((m) => (m.id === matchId ? carded : m)));
+  };
+
+  const undoRedCard = (matchId, side) => {
+    setMatches((prev) => prev.map((m) => (m.id === matchId ? takeBackRed(m, side) : m)));
   };
 
   const advance = () => {
@@ -239,6 +262,7 @@ export function useTournament() {
   /* stats — shared by every mode */
   const topScorers = useMemo(() => computeTopScorers(players, goals), [players, goals]);
   const minuteData = useMemo(() => computeMinuteBuckets(goals), [goals]);
+  const cardCounts = useMemo(() => computeCardCounts(players, matches), [players, matches]);
   const quickestGoal = goals.length ? goals.reduce((a, g) => (g.second < a.second ? g : a), goals[0]) : null;
   const lastGasp = goals.filter((g) => g.duration > 0 && g.duration - g.second <= 10)
     .sort((a, b) => (a.duration - a.second) - (b.duration - b.second))[0] || null;
@@ -299,11 +323,11 @@ export function useTournament() {
 
   return {
     players, nameInput, mode, config, matches, goals, modeState, stakes, tab, history, loaded,
-    activeMode, standings, champion, lastPlace, nameOf, topScorers, minuteData, quickestGoal, lastGasp, winsTable,
+    activeMode, standings, champion, lastPlace, nameOf, topScorers, minuteData, cardCounts, quickestGoal, lastGasp, winsTable,
     timerControls,
     actions: {
       setNameInput, addPlayer, addTeam, removePlayer, setStake, setMode, setConfigValue,
-      handleGenerate, resetAll, togglePlayed, addGoal, undoGoal, giveCard, advance, setTab,
+      handleGenerate, resetAll, togglePlayed, addGoal, undoGoal, giveCard, giveRedCard, undoRedCard, advance, setTab,
       deleteHistoryEntry, clearHistory,
     },
   };

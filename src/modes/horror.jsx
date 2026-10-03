@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import { Skull } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { generateGroupMatches } from "../engine/match.js";
-import { dealHorrors, horrorOf, computeHorrorStandings } from "../engine/horror.js";
+import { dealHorrors, horrorOf, tipOf, computeHorrorStandings } from "../engine/horror.js";
+import { DEFAULT_ORDER, ORDERS, formatOrder, bandOf } from "../engine/tiers.js";
 import { lastOfTable } from "../engine/stakes.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
@@ -48,8 +49,8 @@ function FixturesView({ players, matches, config, nameOf, champion, timerControl
           <div className="space-y-3">
             {hm.filter((m) => m.leg === leg).map((m) => (
               <div key={m.id}>
-                <HorrorBanner twist={horrorOf(m.twist)} played={m.played} />
-                <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
+                <HorrorBanner twist={horrorOf(m.twist)} played={m.played} tier={m.tier} tip={tipOf(m.twist)} />
+                <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard}
                   onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
               </div>
             ))}
@@ -74,6 +75,7 @@ export default {
   stages: ["horror"],
   config: {
     horrorLegs: { type: "choice", label: "Times each pair plays", options: [1, 2, 3, 4], default: DEFAULT_LEGS },
+    horrorOrder: { type: "choice", label: "Rule order", options: ORDERS, default: DEFAULT_ORDER, format: formatOrder },
   },
   summary: ({ players, config }) => {
     const legCount = config.horrorLegs ?? DEFAULT_LEGS;
@@ -83,7 +85,7 @@ export default {
         <b style={{ color: C.ink }}>{matchCount} matches</b>, each one dealt a spooky rule. <b style={{ color: C.ink }}>Open</b> rules
         are shown to everyone to act out. <b style={{ color: C.ink }}>Secret</b> rules are sealed — only the referee can peek — and
         they <b style={{ color: C.ink }}>rewrite the result at full time</b>:
-        the winner might lose, nobody might score a point, or the loser might be drained dry.
+        the winner might lose, the loser might be drained dry, or two players might swap their points.
       </>
     );
   },
@@ -94,9 +96,11 @@ export default {
   },
   createFixtures: ({ players, config, rng = Math.random }) => {
     const base = generateGroupMatches(players, config.horrorLegs ?? DEFAULT_LEGS, rng);
-    const twists = dealHorrors(base.length, rng);
+    const order = config.horrorOrder ?? DEFAULT_ORDER;
+    const twists = dealHorrors(base.length, rng, order);
     return {
-      matches: base.map((m, i) => ({ ...m, stage: "horror", twist: twists[i] })),
+      // the level is stamped on the match, as chaos does, so it can't be re-labelled later
+      matches: base.map((m, i) => ({ ...m, stage: "horror", twist: twists[i], ...(order === "climb" ? { tier: bandOf(i, base.length) } : {}) })),
       modeState: {},
       initialTab: "fixtures",
     };

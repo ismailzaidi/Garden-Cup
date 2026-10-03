@@ -53,8 +53,8 @@ function circleHosts(seats, n) {
   };
 }
 
-// Shared by every mode with a round-robin group stage (league, roundrobin,
-// chaos, goldenboot, survivor, worldcup's groups, leaguechaos).
+// Shared by every mode with a round-robin group stage (league, chaos,
+// goldenboot, survivor, horror, worldcup's groups).
 export function generateGroupMatches(players, legCount, rng = Math.random) {
   const pairs = [];
   for (let i = 0; i < players.length; i++) {

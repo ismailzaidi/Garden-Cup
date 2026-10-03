@@ -21,6 +21,11 @@ export default {
   stages: ["knockout"],            // the match.stage values this mode owns —
                                     // stages[0] is used by the shell to compute
                                     // the generic `standings` prop (see below)
+  goalStages: ["knockout"],        // optional — the stages with no points
+                                    // table (a bracket tie, a king match, a
+                                    // goal race). A red card costs goals
+                                    // there instead of points; omit it and
+                                    // every stage docks points.
 
   /* setup */
   config: {                        // declarative — SetupView renders one
@@ -146,7 +151,8 @@ need and ignore the rest.
   champion,                   // this mode's champion() result, already computed
   timerControls,              // (matchId) => { timer, onStart, onPause, onReset, onSetDuration }
   actions: {
-    addGoal, undoGoal, giveCard, togglePlayed, advance, setTab,
+    addGoal, undoGoal, giveCard, giveRedCard, undoRedCard,
+    togglePlayed, advance, setTab,
   },
 }
 ```
@@ -158,17 +164,24 @@ none to take. Pass it to every `MatchCard` as `onCard` — it only ever moves
 leaves on the match are for the badge only; never read them to decide a
 result.
 
+`giveRedCard(matchId, side)` is the red card, passed as `onRedCard` (with
+`undoRedCard` as `onUndoRedCard`). It docks 3 points by writing `d1`/`d2` on
+the match, which `computeStandings` and `computeHorrorStandings` subtract —
+so a mode that builds its table from either gets the deduction for free, and
+a mode that ranks any other way must list those stages in `goalStages`.
+
 ## What is shared and must not move into a mode
 
 These live in `engine/` and `components/`; modes import them rather than
 redefining them:
 
-- `computeStandings`, `computeTopScorers`, `computeMinuteBuckets` — generic
+- `computeStandings`, `computeTopScorers`, `computeMinuteBuckets`,
+  `computeCardCounts` — generic
   over any list of matches; also power the shared Stats tab.
 - `matchWinner`, `shuffle`, `randomOrder`, `roundLabel`, `makeId`.
 - `generateGroupMatches` — the round-robin generator used by every mode with
-  a round-robin phase (`league`, `roundrobin`, `chaos`, `goldenboot`,
-  `survivor`, `leaguechaos`). It stamps `stage: "group"`; a mode owning a
+  a round-robin phase (`league`, `chaos`, `goldenboot`, `survivor`,
+  `horror`, `worldcup`'s groups). It stamps `stage: "group"`; a mode owning a
   different stage remaps the returned matches rather than changing the
   generator. It also owns home/away balance: `p1` is the home side, and the
   generator guarantees every player a fair share of home starts, so a mode
@@ -178,8 +191,12 @@ redefining them:
   Use it instead of calling `randomOrder` per leg, which can hand one player
   every away start.
 - `engine/twists.js` — `TWISTS`, `dealTwists`, `twistOf`, the deck of silly
-  real-world rules shared by `chaos` and `leaguechaos`. A twist must never
+  real-world rules dealt by `chaos`. A twist must never
   change how a goal counts, or the generic standings stop being valid.
+- `engine/tiers.js` — the easy-to-hard bands shared by the `chaos` and
+  `horror` decks. A mode with a dealt deck takes a `*Order` config choice,
+  asks `bandOf(i, count)` which tier match `i` is dealt from, and stamps
+  `tier` on the match; the banner reads it back from there.
 - `engine/horror.js` — the `horror` mode's separate deck of secret and open rules.
   Unlike a twist, a horror rule's `fate` *does* change points (the winner
   loses, both lose, points drained…). Fates are applied only by

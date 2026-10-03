@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import horror from "../src/modes/horror.jsx";
-import { HORROR_TWISTS, RETIRED_HORRORS, FATES, FATE_VERDICT, isSecret, dealHorrors, horrorOf, fateOutcome, computeHorrorStandings } from "../src/engine/horror.js";
+import { HORROR_TWISTS, RETIRED_HORRORS, TIER_2 as H_TIER_2, TIER_3 as H_TIER_3, tierOf as hTierOf, tipOf as hTipOf, FATES, FATE_VERDICT, isSecret, dealHorrors, horrorOf, fateOutcome, computeHorrorStandings } from "../src/engine/horror.js";
 
 function seededRng(seed) {
   let s = seed;
@@ -17,9 +17,9 @@ const match = (p1, p2, s1, s2, fate) => ({ id: `${p1}${p2}${fate}`, stage: "horr
 const row = (standings, id) => standings.find((r) => r.id === id);
 
 describe("the horror deck", () => {
-  it("deals from 102 rules and still resolves the 24 retired ones", () => {
-    expect(HORROR_TWISTS).toHaveLength(102);
-    expect(RETIRED_HORRORS).toHaveLength(24);
+  it("deals from 92 rules and still resolves the 34 retired ones", () => {
+    expect(HORROR_TWISTS).toHaveLength(92);
+    expect(RETIRED_HORRORS).toHaveLength(34);
     // a saved tournament dealt a retired rule keeps its banner and its fate
     expect(RETIRED_HORRORS.every((t) => horrorOf(t.key) === t)).toBe(true);
   });
@@ -38,6 +38,17 @@ describe("the horror deck", () => {
   it("has no mercy: nothing in the live deck pities the loser", () => {
     expect(HORROR_TWISTS.filter((t) => t.fate === "pity")).toEqual([]);
     expect(HORROR_TWISTS.filter((t) => /\b(mercy|pity|pitied|sympathy)\b/i.test(t.detail))).toEqual([]);
+  });
+
+  it("always leaves a winning side: no live rule voids a match or makes both players lose", () => {
+    expect(HORROR_TWISTS.filter((t) => t.fate === "void" || t.fate === "both-lose")).toEqual([]);
+    // every live fate still pays the winner of a decided match more than the loser
+    const liveFates = [...new Set(HORROR_TWISTS.map((t) => t.fate))];
+    for (const fate of liveFates) {
+      const [home, away] = fateOutcome(fate, 3, 0);
+      expect(home.pts).not.toBe(away.pts);
+      expect([home.r, away.r].sort()).toEqual(["l", "w"]);
+    }
   });
 
   it("asks no player to make noises, put on a voice, or tell a story", () => {
@@ -60,7 +71,7 @@ describe("the horror deck", () => {
   it("splits into secret rules (change the result) and open rules (everyone acts them out)", () => {
     const secret = HORROR_TWISTS.filter(isSecret);
     const open = HORROR_TWISTS.filter((t) => !isSecret(t));
-    expect(secret).toHaveLength(43);
+    expect(secret).toHaveLength(33);
     expect(open).toHaveLength(59);
     expect(secret.every((t) => t.fate !== "normal" && FATE_VERDICT[t.fate])).toBe(true);
     expect(open.every((t) => t.fate === "normal")).toBe(true);
@@ -91,6 +102,15 @@ describe("dealHorrors", () => {
     const dealt = dealHorrors(105, seededRng(13));
     expect(dealt).toHaveLength(105);
     expect(dealt.every((k) => horrorOf(k) !== null)).toBe(true);
+  });
+
+  it("deals every secret effect once before any of them comes round again", () => {
+    const liveSecretFates = new Set(HORROR_TWISTS.filter(isSecret).map((t) => t.fate));
+    for (const seed of [1, 2, 3, 4, 5]) {
+      const secrets = dealHorrors(HORROR_TWISTS.length, seededRng(seed)).map(horrorOf).filter(isSecret);
+      const firstRound = secrets.slice(0, liveSecretFates.size).map((t) => t.fate);
+      expect(new Set(firstRound).size).toBe(liveSecretFates.size);
+    }
   });
 
   it("never deals a retired rule", () => {
@@ -206,6 +226,14 @@ describe("computeHorrorStandings", () => {
     expect(row(t, "p0")).toMatchObject({ w: 1, gf: 2 });
   });
 
+  it("docks a red card's points, before a swap moves the totals", () => {
+    const docked = computeHorrorStandings(two, [{ ...match("p0", "p1", 1, 0, "normal"), d1: 3 }]);
+    expect(row(docked, "p0").pts).toBe(0);
+    const swapped = computeHorrorStandings(two, [{ ...match("p0", "p1", 1, 0, "swap"), d1: 3 }]);
+    expect(row(swapped, "p0").pts).toBe(0);
+    expect(row(swapped, "p1").pts).toBe(0);
+  });
+
   it("ignores unplayed matches", () => {
     const t = computeHorrorStandings(two, [{ ...match("p0", "p1", 5, 0, "double"), played: false }]);
     expect(t.every((r) => r.played === 0 && r.pts === 0)).toBe(true);
@@ -228,5 +256,55 @@ describe("horror.champion", () => {
     const ps = players(2);
     expect(horror.champion({ players: ps, matches: [{ ...match("p0", "p1", 1, 0, "normal"), played: false }] })).toBeNull();
     expect(horror.champion({ players: ps, matches: [match("p0", "p1", 2, 0, "both-lose")] })).toBeNull();
+  });
+});
+
+describe("horror tiers and the climbing deal", () => {
+  const live = new Set(HORROR_TWISTS.map((t) => t.key));
+  const tierRules = (tier) => HORROR_TWISTS.filter((t) => hTierOf(t.key) === tier);
+
+  it("only lists live rules in the tier sets, so a typo can't hide", () => {
+    for (const key of [...H_TIER_2, ...H_TIER_3]) expect(live.has(key), key).toBe(true);
+    expect([...H_TIER_2].filter((k) => H_TIER_3.has(k))).toEqual([]);
+  });
+
+  it("ramps the secret effects: kind first, the No Mercy set last", () => {
+    const fatesIn = (tier) => new Set(tierRules(tier).filter(isSecret).map((t) => t.fate));
+    expect([...fatesIn(1)].sort()).toEqual(["double", "truce"]);
+    expect([...fatesIn(3)].sort()).toEqual(["draw10", "draw6", "rotate", "skip-all", "swap", "wipeout"]);
+    expect(fatesIn(2).has("reverse")).toBe(true);
+  });
+
+  it("has enough in every tier to fill a third of a long tournament", () => {
+    for (const tier of [1, 2, 3]) expect(tierRules(tier).length).toBeGreaterThanOrEqual(12);
+  });
+
+  it("borrows a how-to for each skill rule, and only for live rules", () => {
+    for (const key of ["phantom-shot", "double-phantom", "spellbound-goal", "chain-of-curses"]) expect(hTipOf(key)).toBeTruthy();
+    expect(hTipOf("possessed-keeper")).toBeNull();
+  });
+
+  it("deals the easy tier first and the hard tier last", () => {
+    for (const seed of [1, 2, 3]) {
+      const tiers = dealHorrors(30, seededRng(seed), "climb").map(hTierOf);
+      expect(tiers.slice(0, 10).every((t) => t === 1)).toBe(true);
+      expect(tiers.slice(10, 20).every((t) => t === 2)).toBe(true);
+      expect(tiers.slice(20).every((t) => t === 3)).toBe(true);
+    }
+  });
+
+  it("never repeats a rule while a tier has an unused one, and never deals a retired rule", () => {
+    const dealt = dealHorrors(36, seededRng(7), "climb");
+    expect(new Set(dealt).size).toBe(36);
+    const retired = new Set(RETIRED_HORRORS.map((t) => t.key));
+    expect(dealt.filter((k) => retired.has(k))).toEqual([]);
+  });
+
+  it("horror.createFixtures climbs by default, stamps the level, and keeps every match winnable", () => {
+    const { matches } = horror.createFixtures({ players: players(4), config: { horrorLegs: 1 }, rng: seededRng(3) });
+    expect(matches.map((m) => m.tier)).toEqual([1, 1, 2, 2, 3, 3]);
+    expect(matches.every((m) => hTierOf(m.twist) === m.tier)).toBe(true);
+    const mixed = horror.createFixtures({ players: players(4), config: { horrorLegs: 1, horrorOrder: "random" }, rng: seededRng(3) });
+    expect(mixed.matches.every((m) => m.tier === undefined)).toBe(true);
   });
 });

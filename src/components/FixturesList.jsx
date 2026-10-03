@@ -6,7 +6,7 @@ import ProgressBar from "./ProgressBar.jsx";
 
 const FILTERS = [{ k: "all", l: "All" }, { k: "remaining", l: "Remaining" }, { k: "played", l: "Played" }];
 
-// Shared by every mode with a group stage (league, roundrobin) — identical
+// Shared by every mode with a plain group stage (league) — identical
 // fixtures-by-leg list with an all/remaining/played filter.
 export default function FixturesList({ matches, legCount, nameOf, timerControls, actions }) {
   const [filter, setFilter] = useState("all");
@@ -38,7 +38,7 @@ export default function FixturesList({ matches, legCount, nameOf, timerControls,
           </div>
           <div className="space-y-2.5">
             {visible.filter((m) => m.leg === leg).map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
             ))}
           </div>
         </div>

@@ -2,7 +2,7 @@ import { Trophy, Trash2, X } from "lucide-react";
 import { membersOf } from "../engine/teams.js";
 import { C } from "../lib/theme.js";
 import { formatDate } from "../engine/format.js";
-import { MODES } from "../modes/index.js";
+import { modeLabel } from "../modes/index.js";
 import EmptyCard from "../components/EmptyCard.jsx";
 
 export default function HistoryView({ history, actions }) {
@@ -19,7 +19,6 @@ export default function HistoryView({ history, actions }) {
       </div>
       <div className="space-y-2.5">
         {history.map((h) => {
-          const meta = MODES.find((m) => m.key === h.mode);
           // a team is listed with the people in it — they're who the Wins tab credits
           const withMembers = (name) => {
             const members = membersOf(h, name);
@@ -31,7 +30,7 @@ export default function HistoryView({ history, actions }) {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded uppercase" style={{ backgroundColor: C.pitch, color: "#F7F5EE" }}>
-                      {meta ? meta.label : h.mode}
+                      {modeLabel(h.mode)}
                     </span>
                     <span className="text-[10px]" style={{ color: C.mute }}>{formatDate(h.date)}</span>
                   </div>

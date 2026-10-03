@@ -4,6 +4,10 @@
  * added there. It's a plain allow-list rather than a SQL ENUM deliberately:
  * a new mode should never need a schema migration — see the `mode`/`stage`
  * column comments in migrations/001_init.sql.
+ *
+ * roundrobin, bestofn and leaguechaos are retired on the client
+ * (RETIRED_MODES in src/modes/index.js) and stay listed here on purpose: a
+ * history record played in one must still be accepted when it's imported.
  */
 export const MODE_STAGES = {
   league: ["group", "final"],

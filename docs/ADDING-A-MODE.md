@@ -8,6 +8,12 @@ your mode work, stop — that means the mode contract is missing something, not
 that your mode is unusual. Extend the contract (documented in full in
 [`contract.md`](../src/modes/contract.md)) instead of special-casing it.
 
+> **Note:** Best of N, the worked example below, has since been retired and
+> `src/modes/bestofn.jsx` no longer exists (see `RETIRED_MODES` in
+> `src/modes/index.js`). The walkthrough is still an accurate picture of what
+> a mode file looks like; `roundrobin.jsx`, also mentioned, became the
+> "No final" option on `league.jsx`.
+
 This walks through adding a real mode, **Best of N** — two players, a fixed
 number of legs, most points after all legs wins — so you can see the shape of
 a real diff, not just the interface.
@@ -80,7 +86,7 @@ function MatchesView({ matches, nameOf, champion, standings, timerControls, acti
       <div className="space-y-2.5">
         {matches.map((m) => (
           <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal}
-            onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
+            onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
         ))}
       </div>
       {playedCount < matches.length && (

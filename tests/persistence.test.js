@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { migrateState } from "../src/engine/persistence.js";
+import { migrateState, retireMode } from "../src/engine/persistence.js";
 
 describe("migrateState", () => {
   it("passes through a v2 blob unchanged", () => {
@@ -49,5 +49,32 @@ describe("migrateState", () => {
     const migrated = migrateState(v1);
     expect(migrated.modeState).toEqual({ queue: [] });
     expect(migrated.config).toEqual({ legCount: 3, kingTarget: 3 });
+  });
+});
+
+describe("retireMode", () => {
+  const known = ["league", "knockout"];
+  const saved = (mode) => ({
+    mode, players: [{ id: "a", name: "A" }], matches: [{ id: "m" }], goals: [{ id: "g" }],
+    config: { legCount: 2 }, modeState: { x: 1 }, historySaved: true,
+  });
+
+  it("leaves a tournament in a live mode alone", () => {
+    const state = saved("knockout");
+    expect(retireMode(state, known)).toBe(state);
+    expect(retireMode(null, known)).toBeNull();
+  });
+
+  it("carries a Pure League on as a League with no final", () => {
+    const next = retireMode(saved("roundrobin"), known);
+    expect(next).toMatchObject({ mode: "league", config: { legCount: 2, finalLegs: 0 } });
+    expect(next.matches).toHaveLength(1);
+    expect(next.goals).toHaveLength(1);
+  });
+
+  it("keeps the roster but drops the fixtures of a mode with no equivalent", () => {
+    const next = retireMode(saved("bestofn"), known);
+    expect(next).toMatchObject({ mode: "league", matches: [], goals: [], modeState: {}, historySaved: false });
+    expect(next.players).toHaveLength(1);
   });
 });

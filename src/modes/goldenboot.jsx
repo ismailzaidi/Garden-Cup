@@ -128,7 +128,7 @@ function RaceView({ players, matches, config, nameOf, champion, timerControls, a
           <SectionLabel>Round {leg}</SectionLabel>
           <div className="space-y-2.5">
             {gm.filter((m) => (m.leg || 1) === leg).map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard}
                 onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
             ))}
           </div>
@@ -145,6 +145,8 @@ export default {
   icon: Target,
   minPlayers: 2,
   stages: ["goldenboot"],
+  // no points table here, so a red card costs goals instead
+  goalStages: ["goldenboot"],
   config: {
     bootTarget: { type: "choice", label: "Goals to win the Golden Boot", options: [5, 10, 15], default: DEFAULT_TARGET },
   },

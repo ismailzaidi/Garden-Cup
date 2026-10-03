@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MODES } from "../src/modes/index.js";
+import { MODES, RETIRED_MODES } from "../src/modes/index.js";
 import { MODE_STAGES } from "../api/_lib/modes.js";
 
 // api/_lib/modes.js can't import this client registry (it's JSX, and the
@@ -10,7 +10,8 @@ import { MODE_STAGES } from "../api/_lib/modes.js";
 // the user just sees a stuck "Sync error" pill with no further clue.
 describe("api/_lib/modes.js stays in sync with src/modes/index.js", () => {
   it("declares the same set of modes", () => {
-    const clientKeys = MODES.map((m) => m.key).sort();
+    // retired modes stay on the server so their old history can be imported
+    const clientKeys = [...MODES.map((m) => m.key), ...Object.keys(RETIRED_MODES)].sort();
     const serverKeys = Object.keys(MODE_STAGES).sort();
     expect(serverKeys).toEqual(clientKeys);
   });
@@ -19,6 +20,9 @@ describe("api/_lib/modes.js stays in sync with src/modes/index.js", () => {
     for (const mode of MODES) {
       expect(MODE_STAGES[mode.key], `api/_lib/modes.js is missing mode "${mode.key}"`).toBeDefined();
       expect([...MODE_STAGES[mode.key]].sort()).toEqual([...mode.stages].sort());
+    }
+    for (const [key, retired] of Object.entries(RETIRED_MODES)) {
+      expect([...MODE_STAGES[key]].sort()).toEqual([...retired.stages].sort());
     }
   });
 });
