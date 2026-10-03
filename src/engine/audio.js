@@ -177,6 +177,16 @@ export function playResultCue(won) {
   } catch { /* no audio */ }
 }
 
+/* Fallback for a slow-play card (engine/cards.js) when there's no usable
+   local voice: two short high blasts, a referee's whistle near enough. */
+export function playWhistle() {
+  try {
+    unlockAudio();
+    tone(2100, "square", 0, 0.12, 0.12);
+    tone(2100, "square", 0.18, 0.3, 0.12);
+  } catch { /* no audio */ }
+}
+
 /* Says "Game paused" through the speak() primitive above, repeated by
    useTimers every couple of seconds for as long as a timer stays paused —
    players kept asking whether the game was paused, so one announcement on

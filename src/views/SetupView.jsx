@@ -1,11 +1,63 @@
+import { useState } from "react";
 import { Plus, X, Target } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { MODES } from "../modes/index.js";
+import { parseMembers } from "../engine/teams.js";
+import { PRIZE_IDEAS, CHORE_IDEAS } from "../engine/stakes.js";
 import SectionLabel from "../components/SectionLabel.jsx";
 
-export default function SetupView({ players, nameInput, mode, config, matches, activeMode, actions }) {
+const inputStyle = { backgroundColor: "#fff", border: `2px solid ${C.line}`, color: C.ink };
+const inputClass = "w-full min-w-0 rounded-xl px-4 py-3 text-sm font-medium outline-none disabled:opacity-50";
+
+/* One line of what's being played for (engine/stakes.js): free text, with a
+   row of one-tap ideas. Locked once fixtures exist, like the mode pickers —
+   the stakes are agreed before kick-off, not renegotiated at 3-0 down. */
+function StakeField({ label, value, placeholder, ideas, locked, onChange }) {
+  return (
+    <div>
+      <SectionLabel>{label}</SectionLabel>
+      <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={40} disabled={locked}
+        aria-label={label} className={inputClass} style={inputStyle} />
+      {!locked && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {ideas.map((idea) => (
+            <button key={idea} onClick={() => onChange(value === idea ? "" : idea)} className="px-2.5 py-1 rounded-full text-[11px] font-semibold"
+              style={{ backgroundColor: value === idea ? C.pitch : "#EAE6D9", color: value === idea ? "#F7F5EE" : C.ink }}>
+              {idea}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function SetupView({ players, nameInput, mode, config, matches, activeMode, stakes, knownNames = [], actions }) {
   const atMaxPlayers = activeMode.maxPlayers && players.length >= activeMode.maxPlayers;
   const overMaxPlayers = activeMode.maxPlayers && players.length > activeMode.maxPlayers;
+
+  // Adding a team (engine/teams.js): a name for the table, plus the people
+  // in it, who are who the Wins tab credits. Form state only — the team
+  // itself lands in `players` through actions.addTeam.
+  const [entry, setEntry] = useState("player");
+  const [teamName, setTeamName] = useState("");
+  const [membersText, setMembersText] = useState("");
+  const members = parseMembers(membersText);
+  const canAddTeam = teamName.trim() && members.length > 0 && !atMaxPlayers;
+
+  const addTeam = () => {
+    if (!actions.addTeam(teamName, members)) return;
+    setTeamName("");
+    setMembersText("");
+  };
+
+  // People this device already knows — past players and anyone on the
+  // roster — offered as one-tap chips so a name is spelt the same way twice
+  // and lands on the same Wins row.
+  const taken = new Set(members.map((m) => m.toLowerCase()));
+  const suggestions = [...new Set([...players.filter((p) => !p.members).map((p) => p.name), ...knownNames])]
+    .filter((n) => !taken.has(n.toLowerCase())).slice(0, 12);
+  const addMember = (name) => setMembersText(members.length ? `${members.join(", ")}, ${name}` : name);
 
   return (
     <>
@@ -46,8 +98,44 @@ export default function SetupView({ players, nameInput, mode, config, matches, a
         );
       })}
 
+      <StakeField label="Champion's prize" value={stakes.prize} placeholder="e.g. No homework tonight" ideas={PRIZE_IDEAS}
+        locked={matches.length > 0} onChange={(v) => actions.setStake("prize", v)} />
+      <StakeField label="Last place job" value={stakes.chore} placeholder="e.g. Set the table" ideas={CHORE_IDEAS}
+        locked={matches.length > 0} onChange={(v) => actions.setStake("chore", v)} />
+
       <div>
-        <SectionLabel>Add a player</SectionLabel>
+        <SectionLabel right={(
+          <div className="flex gap-1">
+            {[["player", "Player"], ["team", "Team"]].map(([key, label]) => (
+              <button key={key} onClick={() => setEntry(key)} aria-pressed={entry === key} className="px-2.5 py-1 rounded-full text-[11px] font-bold"
+                style={{ backgroundColor: entry === key ? C.pitch : "#EAE6D9", color: entry === key ? "#F7F5EE" : C.ink }}>
+                {label}
+              </button>
+            ))}
+          </div>
+        )}>{entry === "team" ? "Add a team" : "Add a player"}</SectionLabel>
+        {entry === "team" ? (
+          <div className="space-y-2">
+            <input value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Team name" maxLength={24} disabled={atMaxPlayers}
+              className={inputClass} style={inputStyle} />
+            <input value={membersText} onChange={(e) => setMembersText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addTeam()}
+              placeholder="Who's in it? e.g. Sam, Ali" disabled={atMaxPlayers} className={inputClass} style={inputStyle} />
+            {suggestions.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((n) => (
+                  <button key={n} onClick={() => addMember(n)} className="px-2.5 py-1 rounded-full text-[11px] font-semibold" style={{ backgroundColor: "#EAE6D9", color: C.ink }}>
+                    + {n}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button onClick={addTeam} disabled={!canAddTeam} className="w-full py-2.5 rounded-xl text-sm font-bold disabled:opacity-40 active:scale-[0.98] transition-transform"
+              style={{ backgroundColor: C.pitch, color: "#F7F5EE" }}>
+              {members.length > 0 ? `ADD TEAM (${members.length} ${members.length === 1 ? "PLAYER" : "PLAYERS"})` : "ADD TEAM"}
+            </button>
+            <p className="text-[10px]" style={{ color: C.mute }}>A team plays as one side. Its wins count for every player in it on the Wins tab.</p>
+          </div>
+        ) : (
         <div className="flex gap-2">
           <input value={nameInput} onChange={(e) => actions.setNameInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && actions.addPlayer()}
             placeholder="Player name" maxLength={24} disabled={atMaxPlayers}
@@ -58,6 +146,7 @@ export default function SetupView({ players, nameInput, mode, config, matches, a
             <Plus color="#F7F5EE" size={20} strokeWidth={3} />
           </button>
         </div>
+        )}
         {atMaxPlayers && !overMaxPlayers && <p className="text-[10px] mt-2" style={{ color: C.mute }}>This mode needs exactly {activeMode.maxPlayers} players.</p>}
       </div>
 
@@ -69,6 +158,7 @@ export default function SetupView({ players, nameInput, mode, config, matches, a
               <span key={p.id} className="flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-full text-sm font-semibold max-w-full"
                 style={{ backgroundColor: "#fff", border: `2px solid ${C.line}`, color: C.ink }}>
                 <span className="truncate max-w-[150px]">{p.name}</span>
+                {p.members && <span className="truncate max-w-[150px] text-[11px] font-medium" style={{ color: C.mute }}>{p.members.join(", ")}</span>}
                 <button onClick={() => actions.removePlayer(p.id)} className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#EAE6D9" }}>
                   <X size={12} strokeWidth={3} />
                 </button>

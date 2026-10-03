@@ -15,9 +15,16 @@
  * roasts, insults, shame or humiliation forfeits, devils, souls, blood or
  * death played straight — tests/horror.test.js scans the wording for it.
  *
- * Same storage rule as twists.js: append only, never rename or remove a key.
- * `m.twist` stores the key on every horror match, and horrorOf returns null
- * for an unknown key.
+ * The mode has no mercy, and it is not a performance. Two kinds of rule do
+ * not belong in the deck, and tests/horror.test.js holds the line on both:
+ *  - nothing that hands the loser points or a way back in (the "pity" fate
+ *    still exists in FATES, but only for saved matches — nothing live uses it);
+ *  - nothing that asks a player to make noises, put on a voice, give a
+ *    speech or tell a story. A referee's call, or a one-word cue, is fine.
+ *
+ * Same storage rule as twists.js: never rename or delete a key. `m.twist`
+ * stores the key on every horror match, and horrorOf returns null for an
+ * unknown key — retire a rule by moving it to RETIRED_HORRORS at the bottom.
  */
 import { shuffle } from "./match.js";
 
@@ -76,13 +83,6 @@ export const HORROR_TWISTS = [
   { key: "werewolf-hour", emoji: "🐺", fate: "double", label: "Werewolf Hour", detail: "The winner transforms at full time. Double points." },
   { key: "dragon-hoard", emoji: "🐉", fate: "double", label: "Dragon's Hoard", detail: "The winner raids the dragon's hoard and takes 6 points." },
 
-  // ── Cursed results: the loser is pitied ──
-  { key: "sympathy-ghost", emoji: "🫂", fate: "pity", label: "Sympathy Ghost", detail: "The ghosts felt sorry for the loser. The loser gets 3 points too." },
-  { key: "haunted-trophy", emoji: "🎗️", fate: "pity", label: "Haunted Participation Trophy", detail: "Everyone's a winner… spookily. The loser also gets 3 points." },
-  { key: "rise-again", emoji: "🧟", fate: "pity", label: "Rise Again", detail: "The loser rises from the grave clutching 3 points." },
-  { key: "nine-lives", emoji: "🐈‍⬛", fate: "pity", label: "Nine Lives", detail: "The loser spent one of their nine lives: they get 3 points as well." },
-  { key: "banshee-wail", emoji: "😭", fate: "pity", label: "Banshee's Wail", detail: "The banshee wailed so loudly the loser was given 3 points just to make it stop." },
-
   // ── Cursed results: the winner drains the loser ──
   { key: "vampire", emoji: "🧛", fate: "drain", label: "Vampire", detail: "The winner is a vampire: they gain 3 points and drain 3 points from the loser." },
   { key: "leech", emoji: "🪱", fate: "drain", label: "Leech", detail: "A leech latches on. The winner takes 3, the loser loses 3." },
@@ -96,11 +96,9 @@ export const HORROR_TWISTS = [
 
   // ── Haunted keeper ──
   { key: "possessed-keeper", emoji: "😵‍💫", fate: "normal", label: "Possessed Keeper", detail: "Keepers are possessed: arms stiff by their sides like a creepy doll." },
-  { key: "seance-keeper", emoji: "🙈", fate: "normal", label: "Séance Keeper", detail: "Keepers close their eyes and only open them when the shooter shouts BOO before shooting." },
   { key: "mummy-keeper", emoji: "🧻", fate: "normal", label: "Mummy Keeper", detail: "Keepers tuck one arm inside their shirt like a mummy's wrapping." },
   { key: "frankenstein-keeper", emoji: "🔩", fate: "normal", label: "Frankenstein Keeper", detail: "Keepers move stiff-legged like Frankenstein's monster. No bending the knees." },
   { key: "scarecrow-keeper", emoji: "🌾", fate: "normal", label: "Scarecrow Keeper", detail: "Keepers stand arms out like a scarecrow and can only move once the ball is struck." },
-  { key: "vanished-keeper", emoji: "🫥", fate: "normal", label: "Vanished Keeper", detail: "The keeper has vanished. They must stand behind the goal moaning like a ghost." },
   { key: "weeping-angel", emoji: "😶", fate: "normal", label: "Weeping Angel", detail: "Keepers may only move while the shooter isn't looking at them." },
   { key: "coffin-keeper", emoji: "🛌", fate: "normal", label: "Coffin Keeper", detail: "Keepers start each attack sitting down and may only rise from the coffin when the shooter shouts RISE." },
 
@@ -117,17 +115,9 @@ export const HORROR_TWISTS = [
   { key: "puppet-strings", emoji: "🪆", fate: "normal", label: "Puppet Strings", detail: "Once per attack your opponent shouts LEFT or RIGHT, and your next touch must go that way." },
 
   // ── Silly forfeits ──
-  { key: "walk-of-shame", emoji: "🔔", fate: "normal", label: "Ghost Parade", detail: "At full time both players do a slow, spooky ghost parade round the garden, oooo-ing all the way." },
-  { key: "roast-session", emoji: "💐", fate: "normal", label: "Compliment Curse", detail: "After every goal, the scorer must give the other player a spooky compliment: \"That save was scarily good!\"" },
-  { key: "the-eulogy", emoji: "📜", fate: "normal", label: "Comeback Speech", detail: "At full time, the loser gives a dramatic speech about how they'll rise again next match." },
   { key: "dramatic-death", emoji: "🎭", fate: "normal", label: "Dramatic Faint", detail: "Every time you concede, do a theatrical fainting scene on the grass." },
-  { key: "gravestone", emoji: "✍️", fate: "normal", label: "Ghost Story", detail: "At full time, the loser tells a ten-second spooky story about what happened in the match." },
-  { key: "losers-curse", emoji: "🧹", fate: "normal", label: "Groaning Ghoul", detail: "Whoever concedes fetches the ball like a ghoul, groaning all the way there and back." },
   { key: "chicken-of-doom", emoji: "🐔", fate: "normal", label: "Chicken Dance of Doom", detail: "Every goal you concede costs you five seconds of chicken dance." },
-  { key: "grovel", emoji: "🙇", fate: "normal", label: "Monster Manners", detail: "At full time both players bow and say \"Well played, fellow monster.\"" },
   { key: "cursed-nickname", emoji: "🏷️", fate: "normal", label: "Monster Name", detail: "Before kick-off, each player picks a monster name for themselves and must answer to it all match." },
-  { key: "villain-laugh", emoji: "🦹", fate: "normal", label: "Villain Laugh", detail: "Celebrate every goal with an evil villain laugh. Forget and the goal is chalked off." },
-  { key: "scream-queen", emoji: "😱", fate: "normal", label: "Movie Scream", detail: "Concede and you let out your best spooky movie scream." },
   { key: "haunted-portrait", emoji: "📸", fate: "normal", label: "Monster Selfie", detail: "At full time both players pull their scariest monster faces for a photo together." },
 
   // ── Mind games & betrayal ──
@@ -135,42 +125,68 @@ export const HORROR_TWISTS = [
   { key: "whispers", emoji: "🗣️", fate: "normal", label: "Whispers", detail: "Creepy whispers only. Raise your voice and your opponent gets a free shot." },
   { key: "forbidden-word", emoji: "🤐", fate: "normal", label: "Forbidden Word", detail: "Saying the word \"goal\" is forbidden. Say it and your last goal is cancelled." },
   { key: "lights-out", emoji: "🔦", fate: "normal", label: "Lights Out", detail: "Whenever the referee shouts LIGHTS OUT, both players freeze with eyes closed for three seconds." },
-  { key: "jump-scare", emoji: "👹", fate: "normal", label: "Jump Scare", detail: "Once each per match, shout BOO as your opponent shoots. If they flinch, the shot doesn't count." },
   { key: "hot-potato", emoji: "🥔", fate: "normal", label: "Hot Potato Curse", detail: "Hold the ball more than five seconds and the curse passes: free shot to your opponent." },
   { key: "possessed-ref", emoji: "🧑‍⚖️", fate: "normal", label: "Possessed Referee", detail: "The referee may award one completely made-up free kick to each player. No arguing." },
-  { key: "deal-with-devil", emoji: "📝", fate: "normal", label: "Goblin's Bargain", detail: "Once per match, whoever is losing may buy a free penalty by doing a silly forfeit the leader picks: a dance, a song or a funny walk." },
   { key: "doppelganger", emoji: "👥", fate: "normal", label: "Doppelgänger", detail: "Swap identities: you must call yourself by your opponent's name all match." },
   { key: "paranoia", emoji: "👀", fate: "normal", label: "Paranoia", detail: "Every so often the referee shouts BEHIND YOU! and both players must spin round and look." },
-  { key: "creaking-door", emoji: "🚪", fate: "normal", label: "Creaking Door", detail: "Before every shot, make a long creaking-door sound. No creak, no goal." },
-  { key: "haunted-radio", emoji: "📻", fate: "normal", label: "Haunted Radio", detail: "The referee commentates the whole match like a spooky late-night radio narrator." },
 
   // ── Spooky garden ──
   { key: "graveyard-shift", emoji: "🌙", fate: "normal", label: "Graveyard Shift", detail: "Slow, silent, sneaky football. Make a loud noise and you lose the ball." },
   { key: "lava-graveyard", emoji: "🌋", fate: "normal", label: "The Floor Is Lava", detail: "When the referee shouts LAVA, both players stand on one leg until they shout SAFE." },
   { key: "spider-crawl", emoji: "🕷️", fate: "normal", label: "Spider Crawl", detail: "Before every kick-off, both players crab-walk like spiders to their own goal and back." },
-  { key: "witchs-brew", emoji: "🧪", fate: "normal", label: "Witch's Brew", detail: "Before each kick-off, both players stir an imaginary cauldron and cackle." },
   { key: "bat-wings", emoji: "🪽", fate: "normal", label: "Bat Wings", detail: "Flap your arms like bat wings whenever you don't have the ball." },
   { key: "rattling-bones", emoji: "☠️", fate: "normal", label: "Rattling Bones", detail: "Shake every limb like a rattling skeleton before every shot." },
-  { key: "haunted-goal", emoji: "🥅", fate: "normal", label: "Haunted Goal", detail: "One goal is haunted. Goals scored into it only count if the scorer says \"sorry, ghost\" first." },
   { key: "moonwalk", emoji: "🌚", fate: "normal", label: "Zombie Moonwalk", detail: "After conceding, moonwalk all the way back to your goal." },
-  { key: "creepy-doll", emoji: "🧸", fate: "normal", label: "Creepy Doll", detail: "Talk like a creepy doll whenever you have the ball: \"Play with meeee…\"" },
   { key: "shadow-marker", emoji: "🖤", fate: "normal", label: "Shadow", detail: "After every goal, the conceder must shadow the scorer's every move for ten seconds." },
   { key: "tombstone-wall", emoji: "🧱", fate: "normal", label: "Tombstone Wall", detail: "Free kicks are defended by kneeling like a tombstone in front of the ball." },
   { key: "eerie-silence", emoji: "🤫", fate: "normal", label: "Eerie Silence", detail: "Total silence all match. First to speak gives away a free shot." },
   { key: "ghost-whistle", emoji: "📯", fate: "normal", label: "Ghost Whistle", detail: "The referee may blow an imaginary whistle at any time. Both players freeze like statues until it blows again." },
-  { key: "last-words", emoji: "💬", fate: "normal", label: "Spooky Catchphrase", detail: "Before every shot, shout your spooky catchphrase." },
 
   // ── No Mercy ──
   { key: "no-mercy", emoji: "🚫", fate: "normal", label: "No Mercy", detail: "Lead by four and the match ends on the spot. The loser does a forfeit of the winner's choosing." },
-  { key: "beg-for-mercy", emoji: "🙏", fate: "normal", label: "Ask for Mercy", detail: "Concede two in a row and you may politely ask for mercy. Your opponent decides if you get a free penalty." },
   { key: "stacking-curse", emoji: "📚", fate: "normal", label: "Stacking Curse", detail: "Curses stack as you concede: 1st, weak foot only. 2nd, one arm tucked in. 3rd, hop everywhere." },
   { key: "draw-four", emoji: "🃏", fate: "normal", label: "Draw Four", detail: "Concede and do four of whatever the scorer picks: star jumps, spins or squats." },
   { key: "skipped", emoji: "⏭️", fate: "normal", label: "Skipped", detail: "Once each per match, shout SKIP: your opponent must stand still for the next kick-off." },
 ];
+
+/* Rules taken out of the deck. They are never dealt again, but horrorOf still
+   resolves them, so a saved tournament that was dealt one keeps its banner
+   and — for the pity rules — its fate. Retire a rule by moving it here,
+   never by deleting it. */
+export const RETIRED_HORRORS = [
+  // ── Players had to make noises, put on a voice, or tell a story ──
+  { key: "seance-keeper", emoji: "🙈", fate: "normal", label: "Séance Keeper", detail: "Keepers close their eyes and only open them when the shooter shouts BOO before shooting." },
+  { key: "vanished-keeper", emoji: "🫥", fate: "normal", label: "Vanished Keeper", detail: "The keeper has vanished. They must stand behind the goal moaning like a ghost." },
+  { key: "walk-of-shame", emoji: "🔔", fate: "normal", label: "Ghost Parade", detail: "At full time both players do a slow, spooky ghost parade round the garden, oooo-ing all the way." },
+  { key: "roast-session", emoji: "💐", fate: "normal", label: "Compliment Curse", detail: "After every goal, the scorer must give the other player a spooky compliment: \"That save was scarily good!\"" },
+  { key: "the-eulogy", emoji: "📜", fate: "normal", label: "Comeback Speech", detail: "At full time, the loser gives a dramatic speech about how they'll rise again next match." },
+  { key: "gravestone", emoji: "✍️", fate: "normal", label: "Ghost Story", detail: "At full time, the loser tells a ten-second spooky story about what happened in the match." },
+  { key: "losers-curse", emoji: "🧹", fate: "normal", label: "Groaning Ghoul", detail: "Whoever concedes fetches the ball like a ghoul, groaning all the way there and back." },
+  { key: "grovel", emoji: "🙇", fate: "normal", label: "Monster Manners", detail: "At full time both players bow and say \"Well played, fellow monster.\"" },
+  { key: "villain-laugh", emoji: "🦹", fate: "normal", label: "Villain Laugh", detail: "Celebrate every goal with an evil villain laugh. Forget and the goal is chalked off." },
+  { key: "scream-queen", emoji: "😱", fate: "normal", label: "Movie Scream", detail: "Concede and you let out your best spooky movie scream." },
+  { key: "jump-scare", emoji: "👹", fate: "normal", label: "Jump Scare", detail: "Once each per match, shout BOO as your opponent shoots. If they flinch, the shot doesn't count." },
+  { key: "creaking-door", emoji: "🚪", fate: "normal", label: "Creaking Door", detail: "Before every shot, make a long creaking-door sound. No creak, no goal." },
+  { key: "haunted-radio", emoji: "📻", fate: "normal", label: "Haunted Radio", detail: "The referee commentates the whole match like a spooky late-night radio narrator." },
+  { key: "witchs-brew", emoji: "🧪", fate: "normal", label: "Witch's Brew", detail: "Before each kick-off, both players stir an imaginary cauldron and cackle." },
+  { key: "haunted-goal", emoji: "🥅", fate: "normal", label: "Haunted Goal", detail: "One goal is haunted. Goals scored into it only count if the scorer says \"sorry, ghost\" first." },
+  { key: "creepy-doll", emoji: "🧸", fate: "normal", label: "Creepy Doll", detail: "Talk like a creepy doll whenever you have the ball: \"Play with meeee…\"" },
+  { key: "last-words", emoji: "💬", fate: "normal", label: "Spooky Catchphrase", detail: "Before every shot, shout your spooky catchphrase." },
+
+  // ── Mercy: the loser was handed points, or a way back in ──
+  { key: "sympathy-ghost", emoji: "🫂", fate: "pity", label: "Sympathy Ghost", detail: "The ghosts felt sorry for the loser. The loser gets 3 points too." },
+  { key: "haunted-trophy", emoji: "🎗️", fate: "pity", label: "Haunted Participation Trophy", detail: "Everyone's a winner… spookily. The loser also gets 3 points." },
+  { key: "rise-again", emoji: "🧟", fate: "pity", label: "Rise Again", detail: "The loser rises from the grave clutching 3 points." },
+  { key: "nine-lives", emoji: "🐈‍⬛", fate: "pity", label: "Nine Lives", detail: "The loser spent one of their nine lives: they get 3 points as well." },
+  { key: "banshee-wail", emoji: "😭", fate: "pity", label: "Banshee's Wail", detail: "The banshee wailed so loudly the loser was given 3 points just to make it stop." },
+  { key: "beg-for-mercy", emoji: "🙏", fate: "normal", label: "Ask for Mercy", detail: "Concede two in a row and you may politely ask for mercy. Your opponent decides if you get a free penalty." },
+  { key: "deal-with-devil", emoji: "📝", fate: "normal", label: "Goblin's Bargain", detail: "Once per match, whoever is losing may buy a free penalty by doing a silly forfeit the leader picks: a dance, a song or a funny walk." },
+];
+
 /* true: referee only, sealed until full time. false: shown to everyone. */
 export const isSecret = (twist) => twist.fate !== "normal";
 
-export const horrorOf = (key) => HORROR_TWISTS.find((t) => t.key === key) ?? null;
+export const horrorOf = (key) => HORROR_TWISTS.find((t) => t.key === key) ?? RETIRED_HORRORS.find((t) => t.key === key) ?? null;
 
 /* Same as dealTwists: no repeats until the deck runs dry, then reshuffle. */
 export function dealHorrors(count, rng = Math.random) {

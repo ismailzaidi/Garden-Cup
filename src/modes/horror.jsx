@@ -3,6 +3,7 @@ import { Skull } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { generateGroupMatches } from "../engine/match.js";
 import { dealHorrors, horrorOf, computeHorrorStandings } from "../engine/horror.js";
+import { lastOfTable } from "../engine/stakes.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
 import MatchCard from "../components/MatchCard.jsx";
@@ -48,7 +49,7 @@ function FixturesView({ players, matches, config, nameOf, champion, timerControl
             {hm.filter((m) => m.leg === leg).map((m) => (
               <div key={m.id}>
                 <HorrorBanner twist={horrorOf(m.twist)} played={m.played} />
-                <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal}
+                <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
                   onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
               </div>
             ))}
@@ -101,6 +102,9 @@ export default {
     };
   },
   champion,
+  // last on the horror table, fates applied — not the honest on-pitch one
+  lastPlace: ({ players, matches, champion: champ }) =>
+    lastOfTable(computeHorrorStandings(players, horrorMatchesOf(matches)), champ.id),
   tabs: ({ matches }) => {
     const hm = horrorMatchesOf(matches);
     const playedCount = hm.filter((m) => m.played).length;

@@ -7,6 +7,7 @@ import SetupView from "./views/SetupView.jsx";
 import StatsView from "./views/StatsView.jsx";
 import WinsView from "./views/WinsView.jsx";
 import HistoryView from "./views/HistoryView.jsx";
+import StakesCard from "./components/StakesCard.jsx";
 import SyncIndicator from "./components/SyncIndicator.jsx";
 import InstallPrompt from "./components/InstallPrompt.jsx";
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
@@ -52,8 +53,8 @@ const ALWAYS_ON = new Set(["setup", "wins", "history"]);
 function TournamentShell() {
   const { mode, user, logout } = useAuth();
   const {
-    players, nameInput, mode: tourneyMode, config, matches, goals, modeState, tab, history,
-    activeMode, standings, champion, nameOf, topScorers, minuteData, quickestGoal, lastGasp, winsTable,
+    players, nameInput, mode: tourneyMode, config, matches, goals, modeState, stakes, tab, history,
+    activeMode, standings, champion, lastPlace, nameOf, topScorers, minuteData, quickestGoal, lastGasp, winsTable,
     timerControls, actions,
   } = useTournament();
 
@@ -179,7 +180,8 @@ function TournamentShell() {
 
       <div className="px-4 py-5 pb-20 space-y-5">
         {tab === "setup" && (
-          <SetupView players={players} nameInput={nameInput} mode={tourneyMode} config={config} matches={matches} activeMode={activeMode} actions={actions} />
+          <SetupView players={players} nameInput={nameInput} mode={tourneyMode} config={config} matches={matches} activeMode={activeMode}
+            stakes={stakes} knownNames={winsTable.map((r) => r.name)} actions={actions} />
         )}
 
         {tab === "stats" && (
@@ -189,6 +191,8 @@ function TournamentShell() {
         {tab === "wins" && <WinsView winsTable={winsTable} />}
 
         {tab === "history" && <HistoryView history={history} actions={actions} />}
+
+        {ModeView && <StakesCard stakes={stakes} champion={champion} lastPlace={lastPlace} />}
 
         {ModeView && (
           <ModeView

@@ -93,7 +93,7 @@ function FinalView({ players, matches, nameOf, champion, timerControls, actions 
         {finalMatches.map((m) => (
           <div key={m.id}>
             <TwistBanner twist={twistOf(m.twist)} />
-            <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
+            <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
           </div>
         ))}
       </div>

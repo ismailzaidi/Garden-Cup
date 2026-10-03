@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import horror from "../src/modes/horror.jsx";
-import { HORROR_TWISTS, FATES, FATE_VERDICT, isSecret, dealHorrors, horrorOf, fateOutcome, computeHorrorStandings } from "../src/engine/horror.js";
+import { HORROR_TWISTS, RETIRED_HORRORS, FATES, FATE_VERDICT, isSecret, dealHorrors, horrorOf, fateOutcome, computeHorrorStandings } from "../src/engine/horror.js";
 
 function seededRng(seed) {
   let s = seed;
@@ -11,24 +11,38 @@ function seededRng(seed) {
 }
 
 const players = (n) => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
-const keyWithFate = (fate) => HORROR_TWISTS.find((t) => t.fate === fate).key;
+const EVERY_RULE = [...HORROR_TWISTS, ...RETIRED_HORRORS];
+const keyWithFate = (fate) => EVERY_RULE.find((t) => t.fate === fate).key;
 const match = (p1, p2, s1, s2, fate) => ({ id: `${p1}${p2}${fate}`, stage: "horror", p1, p2, s1: String(s1), s2: String(s2), played: true, twist: keyWithFate(fate) });
 const row = (standings, id) => standings.find((r) => r.id === id);
 
 describe("the horror deck", () => {
-  it("has exactly 100 rules", () => {
-    expect(HORROR_TWISTS).toHaveLength(100);
+  it("deals from 76 rules and still resolves the 24 retired ones", () => {
+    expect(HORROR_TWISTS).toHaveLength(76);
+    expect(RETIRED_HORRORS).toHaveLength(24);
+    // a saved tournament dealt a retired rule keeps its banner and its fate
+    expect(RETIRED_HORRORS.every((t) => horrorOf(t.key) === t)).toBe(true);
   });
 
-  it("has unique keys and labels", () => {
-    expect(new Set(HORROR_TWISTS.map((t) => t.key)).size).toBe(100);
-    expect(new Set(HORROR_TWISTS.map((t) => t.label)).size).toBe(100);
+  it("has unique keys and labels, retired rules included", () => {
+    expect(new Set(EVERY_RULE.map((t) => t.key)).size).toBe(100);
+    expect(new Set(EVERY_RULE.map((t) => t.label)).size).toBe(100);
   });
 
-  it("only uses known fates, uses every one, and has a verdict for each secret fate", () => {
-    expect(HORROR_TWISTS.every((t) => FATES.includes(t.fate))).toBe(true);
-    for (const fate of FATES) expect(HORROR_TWISTS.some((t) => t.fate === fate)).toBe(true);
+  it("only uses known fates, and has a verdict for each secret fate", () => {
+    expect(EVERY_RULE.every((t) => FATES.includes(t.fate))).toBe(true);
+    for (const fate of FATES) expect(EVERY_RULE.some((t) => t.fate === fate)).toBe(true);
     for (const fate of FATES.filter((f) => f !== "normal")) expect(FATE_VERDICT[fate]).toBeTruthy();
+  });
+
+  it("has no mercy: nothing in the live deck pities the loser", () => {
+    expect(HORROR_TWISTS.filter((t) => t.fate === "pity")).toEqual([]);
+    expect(HORROR_TWISTS.filter((t) => /\b(mercy|pity|pitied|sympathy)\b/i.test(t.detail))).toEqual([]);
+  });
+
+  it("asks no player to make noises, put on a voice, or tell a story", () => {
+    const performing = /\b(moan\w*|groan\w*|scream\w*|cackl\w*|laugh\w*|oooo\w*|creak\w*|catchphrase|story|stories|speech|compliment\w*|commentat\w*|narrat\w*|talk like|sing\w*|song)\b/i;
+    expect(HORROR_TWISTS.filter((t) => performing.test(`${t.label} ${t.detail}`)).map((t) => t.key)).toEqual([]);
   });
 
   it("keeps everything players read child-friendly", () => {
@@ -46,8 +60,8 @@ describe("the horror deck", () => {
   it("splits into secret rules (change the result) and open rules (everyone acts them out)", () => {
     const secret = HORROR_TWISTS.filter(isSecret);
     const open = HORROR_TWISTS.filter((t) => !isSecret(t));
-    expect(secret).toHaveLength(39);
-    expect(open).toHaveLength(61);
+    expect(secret).toHaveLength(34);
+    expect(open).toHaveLength(42);
     expect(secret.every((t) => t.fate !== "normal" && FATE_VERDICT[t.fate])).toBe(true);
     expect(open.every((t) => t.fate === "normal")).toBe(true);
   });
@@ -63,13 +77,19 @@ describe("dealHorrors", () => {
   });
 
   it("never repeats within one pass through the deck", () => {
-    expect(new Set(dealHorrors(100, seededRng(11))).size).toBe(100);
+    const n = HORROR_TWISTS.length;
+    expect(new Set(dealHorrors(n, seededRng(11))).size).toBe(n);
   });
 
   it("reshuffles once the deck runs dry", () => {
     const dealt = dealHorrors(105, seededRng(13));
     expect(dealt).toHaveLength(105);
     expect(dealt.every((k) => horrorOf(k) !== null)).toBe(true);
+  });
+
+  it("never deals a retired rule", () => {
+    const retired = new Set(RETIRED_HORRORS.map((t) => t.key));
+    expect(dealHorrors(300, seededRng(17)).filter((k) => retired.has(k))).toEqual([]);
   });
 });
 

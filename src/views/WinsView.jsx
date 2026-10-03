@@ -53,7 +53,7 @@ export default function WinsView({ winsTable }) {
             </div>
           </div>
           <p className="text-[10px] mt-2" style={{ color: C.mute }}>
-            Built from History — delete a tournament there and its wins go with it. Match wins count tournaments finished after the Wins tab was added.
+            Built from History — delete a tournament there and its wins go with it. A team's wins count for every player in it. Match wins count tournaments finished after the Wins tab was added.
           </p>
         </>
       )}

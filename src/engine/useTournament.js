@@ -3,7 +3,10 @@ import { makeId } from "./match.js";
 import { computeStandings, computeTopScorers, computeMinuteBuckets } from "./standings.js";
 import { computeWinsTable } from "./wins.js";
 import { migrateState } from "./persistence.js";
-import { playGoalChime } from "./audio.js";
+import { playGoalChime, playWhistle, speak } from "./audio.js";
+import { applyCard, cardSentence, CARD_GOAL_OFF } from "./cards.js";
+import { teamsOf } from "./teams.js";
+import { lastPlaceOf } from "./stakes.js";
 import { resultSentence, speakResult } from "./announce.js";
 import { useTimers } from "./useTimers.js";
 import { storage } from "../lib/storage.js";
@@ -27,6 +30,8 @@ export function useTournament() {
   const [matches, setMatches] = useState([]);
   const [goals, setGoals] = useState([]);
   const [modeState, setModeState] = useState({});
+  // the champion's prize and last place's helper job — see engine/stakes.js
+  const [stakes, setStakes] = useState({ prize: "", chore: "" });
   const [tab, setTab] = useState("setup");
   const [history, setHistory] = useState([]);
   const [historySaved, setHistorySaved] = useState(false);
@@ -51,6 +56,7 @@ export function useTournament() {
     setMode(d.mode || "league");
     setConfigState((prev) => ({ ...prev, ...(d.config || {}) }));
     setModeState(d.modeState || {});
+    setStakes({ prize: d.stakes?.prize || "", chore: d.stakes?.chore || "" });
     setTournamentId(d.tournamentId || makeId());
     setHistorySaved(!!d.historySaved);
   };
@@ -88,11 +94,11 @@ export function useTournament() {
     clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       storage.set(CURRENT_KEY, JSON.stringify({
-        players, matches, goals, mode, config, modeState, tournamentId, historySaved, schemaVersion: 2,
+        players, matches, goals, mode, config, modeState, stakes, tournamentId, historySaved, schemaVersion: 2,
       })).catch(() => {});
     }, 1500);
     return () => clearTimeout(saveTimeoutRef.current);
-  }, [players, matches, goals, mode, config, modeState, tournamentId, historySaved, loaded]);
+  }, [players, matches, goals, mode, config, modeState, stakes, tournamentId, historySaved, loaded]);
 
   const nameOf = (id) => players.find((p) => p.id === id)?.name ?? "?";
 
@@ -103,6 +109,19 @@ export function useTournament() {
     setPlayers((p) => [...p, { id: makeId(), name: t.slice(0, 24) }]);
     setNameInput("");
   };
+
+  /* a team is a player entry that also names the people in it — see
+     engine/teams.js. Returns whether it was added, so the setup form knows
+     when to clear itself. */
+  const addTeam = (name, members) => {
+    const t = name.trim();
+    if (!t || !members.length) return false;
+    if (activeMode.maxPlayers && players.length >= activeMode.maxPlayers) return false;
+    setPlayers((p) => [...p, { id: makeId(), name: t.slice(0, 24), members }]);
+    return true;
+  };
+
+  const setStake = (key, value) => setStakes((prev) => ({ ...prev, [key]: String(value).slice(0, 40) }));
 
   const removePlayer = (id) => setPlayers((p) => p.filter((x) => x.id !== id));
 
@@ -119,8 +138,9 @@ export function useTournament() {
     setTab(result.initialTab || "setup");
   };
 
-  /* players carry over on purpose — the same people usually play the next
-     tournament too, and retyping names every round is the main friction.
+  /* players (and teams, and what's being played for) carry over on purpose —
+     the same people usually play the next tournament too, and retyping names
+     every round is the main friction.
      No storage.delete here: the persist effect above picks up this state
      change and re-saves the (still-populated) roster on its own debounce —
      deleting first would leave a window with no persisted roster at all,
@@ -170,6 +190,27 @@ export function useTournament() {
     setMatches((prev) => prev.map((m) => (m.id === matchId ? { ...m, [side]: String(Math.max(0, Number(m[side] || 0) - 1)) } : m)));
   };
 
+  /* the slow-play card — see engine/cards.js. A goal taken off leaves the
+     goals log too (the player's most recent one in this match, as undoGoal
+     does), so Stats agrees with the score; a goal handed to the opponent is
+     never logged, because nobody scored it. */
+  const giveCard = (matchId, side) => {
+    const match = matches.find((m) => m.id === matchId);
+    if (!match || match.bye || !match.p1 || !match.p2) return;
+    const pid = side === "s1" ? match.p1 : match.p2;
+    const opponentId = side === "s1" ? match.p2 : match.p1;
+    const { match: carded, effect } = applyCard(match, side);
+    if (!speak(cardSentence(effect, nameOf(pid), nameOf(opponentId)), 1.05)) playWhistle();
+    if (effect === CARD_GOAL_OFF) {
+      setGoals((prev) => {
+        let last = -1;
+        for (let i = prev.length - 1; i >= 0; i--) if (prev[i].matchId === matchId && prev[i].playerId === pid) { last = i; break; }
+        return last === -1 ? prev : prev.filter((_, i) => i !== last);
+      });
+    }
+    setMatches((prev) => prev.map((m) => (m.id === matchId ? carded : m)));
+  };
+
   const advance = () => {
     if (!activeMode.advance) return;
     const result = activeMode.advance({ players, matches, config, modeState, rng: Math.random });
@@ -187,6 +228,12 @@ export function useTournament() {
   const champion = useMemo(
     () => activeMode.champion({ players, matches, config, modeState }),
     [activeMode, players, matches, config, modeState]
+  );
+
+  /* who gets the helper job — empty until there is a champion */
+  const lastPlace = useMemo(
+    () => lastPlaceOf(activeMode, { players, matches, config, modeState, champion }),
+    [activeMode, players, matches, config, modeState, champion]
   );
 
   /* stats — shared by every mode */
@@ -217,6 +264,14 @@ export function useTournament() {
       results: computeStandings(players, matches)
         .map(({ name, played, w, d, l, gf, ga }) => ({ name, played, w, d, l, gf, ga })),
     };
+    // only when used, so a record from a plain tournament keeps its old shape
+    const teams = teamsOf(players);
+    if (teams) record.teams = teams;
+    if (stakes.prize.trim()) record.prize = stakes.prize.trim();
+    if (stakes.chore.trim() && lastPlace.length) {
+      record.chore = stakes.chore.trim();
+      record.lastPlace = lastPlace.map((p) => p.name);
+    }
     setHistory((prev) => {
       const next = [record, ...prev];
       storage.set(HISTORY_KEY, JSON.stringify(next)).catch(() => {});
@@ -243,12 +298,12 @@ export function useTournament() {
   };
 
   return {
-    players, nameInput, mode, config, matches, goals, modeState, tab, history, loaded,
-    activeMode, standings, champion, nameOf, topScorers, minuteData, quickestGoal, lastGasp, winsTable,
+    players, nameInput, mode, config, matches, goals, modeState, stakes, tab, history, loaded,
+    activeMode, standings, champion, lastPlace, nameOf, topScorers, minuteData, quickestGoal, lastGasp, winsTable,
     timerControls,
     actions: {
-      setNameInput, addPlayer, removePlayer, setMode, setConfigValue,
-      handleGenerate, resetAll, togglePlayed, addGoal, undoGoal, advance, setTab,
+      setNameInput, addPlayer, addTeam, removePlayer, setStake, setMode, setConfigValue,
+      handleGenerate, resetAll, togglePlayed, addGoal, undoGoal, giveCard, advance, setTab,
       deleteHistoryEntry, clearHistory,
     },
   };
