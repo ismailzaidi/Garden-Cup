@@ -44,7 +44,7 @@ function FixturesView({ matches, config, nameOf, champion, standings, timerContr
             {cm.filter((m) => m.leg === leg).map((m) => (
               <div key={m.id}>
                 <TwistBanner twist={twistOf(m.twist)} />
-                <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal}
+                <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
                   onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
               </div>
             ))}

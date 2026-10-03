@@ -40,7 +40,7 @@ function ShootoutView({ matches, config, nameOf, champion, timerControls, action
           </div>
           <div className="space-y-2.5">
             {rounds[rn].map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal}
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
                 onTogglePlayed={actions.togglePlayed} needsWinner {...timerControls(m.id)} />
             ))}
           </div>

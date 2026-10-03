@@ -112,7 +112,7 @@ function GroupsView({ players, matches, modeState, nameOf, timerControls, action
             <StandingsTable standings={groupStandings(players, matches, modeState, key)} highlightTopN={2} qualifyLabel="SEMI" />
             <div className="space-y-2.5">
               {gm.map((m) => (
-                <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal}
+                <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
                   onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
               ))}
             </div>
@@ -146,7 +146,7 @@ function KnockoutSection({ title, matches, nameOf, timerControls, actions }) {
       </div>
       <div className="space-y-2.5">
         {matches.map((m) => (
-          <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal}
+          <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
             onTogglePlayed={actions.togglePlayed} needsWinner {...timerControls(m.id)} />
         ))}
       </div>

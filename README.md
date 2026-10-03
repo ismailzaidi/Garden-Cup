@@ -126,6 +126,55 @@ The app ships a web manifest, so on iOS (Share → Add to Home Screen) or
 Android (menu → Install app) it launches fullscreen like a native app and
 works offline after first load.
 
+## Teams
+
+On the Players tab, switch **Add a player** to **Team**: give the team a name
+and say who's in it ("Sam, Ali" — or tap the names the app already knows). A
+team plays as one side in every mode. When it wins, the **Wins** tab credits
+each of its players — the title and the match wins land on Sam's row and
+Ali's row, the same rows their solo wins go on, never on a row called
+"Tigers". Older history where a pair was typed as one name ("Sam + Ali") is
+read the same way.
+
+Teams are saved on each History record, so they travel in the export file
+with everything else. They are not stored by the cloud backend: signed in, a
+tournament pulled back down from the server comes back without them.
+
+## Prizes and the last place forfeit
+
+Also on the Players tab, before the fixtures are made: a **Champion's prize**
+("No homework tonight") and a **Last place forfeit** ("Set the table"). Type your
+own, tap a suggestion (**More ideas** pages through them — the forfeits run
+from chores to workouts to punishments like no screen time), or tap
+**Random** to let the app draw one; leave either blank to play for nothing.
+Both are
+locked once the fixtures exist, shown above the matches while the tournament
+is played, and awarded by name when there's a champion. Players level at the
+bottom share the forfeit. Both are written on the History record.
+
+## Horror mode has no mercy
+
+The Horror deck deals 102 rules. Eleven are skill rules (a fake shot before
+every real one, two fakes in a row, skill finishes only). Fifteen are a No
+Mercy deck borrowed from the card game: sealed rules that hit the loser for
+minus 6 or minus 10, swap two players' whole points totals, pass everyone's
+points down the Players list, or dock every player who wasn't even in the
+match — and open rules where goals, star jumps and free shots stack. Rules that handed the loser points or a way
+back in, and rules that made players make noises, put on a voice or tell a
+story, are retired: never dealt again, but still shown on a saved tournament
+that was dealt one (`RETIRED_HORRORS` in `src/engine/horror.js`).
+
+## The slow-play card
+
+Every match card has a **Card** button under each player, in every mode. It's
+the referee's answer to a game being held up: two taps (the first arms it, so
+a stray thumb can't cost anyone a goal) and that player loses a goal. A player
+with no goals to lose gives the opponent a bonus goal instead, so the card is
+always a one-goal swing. The announcer calls it — "Referee's whistle! Slow
+play card for …" — or a whistle sounds when there's no voice to speak with.
+The little `×2` on the button counts the cards shown in that match. Shown one
+by mistake? Put the score right with the goal buttons.
+
 ## Audio note
 
 Browsers block sound until the user interacts with the page. The app unlocks

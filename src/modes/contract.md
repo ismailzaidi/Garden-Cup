@@ -62,6 +62,13 @@ export default {
   /* derived — pure, no hooks */
   champion: ({ players, matches, config, modeState }) => player | null,
 
+  /* optional — who finished last, as a list (ties share it), for the "last
+     place forfeit" the shell shows (engine/stakes.js). Only called once there is
+     a champion. Omit it and the shell takes the bottom of the table of every
+     match played; supply it when that isn't this mode's idea of last
+     (horror's fates, goldenboot's goal totals, survivor's first one out). */
+  lastPlace: ({ players, matches, config, modeState, champion }) => [player],
+
   /* navigation — return ONLY this mode's own tabs; the shell prepends
      "Players" and appends "Stats"/"History" itself */
   tabs: ({ matches, config, modeState }) => [{ key, label }],
@@ -139,10 +146,17 @@ need and ignore the rest.
   champion,                   // this mode's champion() result, already computed
   timerControls,              // (matchId) => { timer, onStart, onPause, onReset, onSetDuration }
   actions: {
-    addGoal, undoGoal, togglePlayed, advance, setTab,
+    addGoal, undoGoal, giveCard, togglePlayed, advance, setTab,
   },
 }
 ```
+
+`giveCard(matchId, side)` is the referee's slow-play card (`engine/cards.js`):
+it costs the carded player a goal, or hands the opponent one when there is
+none to take. Pass it to every `MatchCard` as `onCard` — it only ever moves
+`s1`/`s2`, so no mode needs to know a card was shown. The `c1`/`c2` counts it
+leaves on the match are for the badge only; never read them to decide a
+result.
 
 ## What is shared and must not move into a mode
 
@@ -166,12 +180,18 @@ redefining them:
 - `engine/twists.js` — `TWISTS`, `dealTwists`, `twistOf`, the deck of silly
   real-world rules shared by `chaos` and `leaguechaos`. A twist must never
   change how a goal counts, or the generic standings stop being valid.
-- `engine/horror.js` — the `horror` mode's separate deck of 100 sealed rules.
+- `engine/horror.js` — the `horror` mode's separate deck of secret and open rules.
   Unlike a twist, a horror rule's `fate` *does* change points (the winner
   loses, both lose, points drained…). Fates are applied only by
   `computeHorrorStandings`, which only the horror mode calls; the shared
   `standings` prop and the Stats tab stay honest. The `twists.js` rule above
   still stands for every other mode.
+- `engine/teams.js` — a team is a `players` entry that also carries
+  `members`. A mode never reads `members`: a team is one player to every
+  fixture generator and table. Only the Wins tab looks inside it.
+- `engine/stakes.js` and `components/StakesCard.jsx` — the champion's prize
+  and last place's forfeit. The shell owns both and renders the card above every
+  mode view; a mode's only say is the optional `lastPlace` above.
 - `engine/bracket.js` — `generateKnockoutRound1`, `latestRoundState`,
   `bracketChampion`, and `advanceBracket`, the single-elimination machinery
   shared by `knockout` and `penalties`. `advanceBracket` takes the stage to

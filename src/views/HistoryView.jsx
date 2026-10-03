@@ -1,4 +1,5 @@
 import { Trophy, Trash2, X } from "lucide-react";
+import { membersOf } from "../engine/teams.js";
 import { C } from "../lib/theme.js";
 import { formatDate } from "../engine/format.js";
 import { MODES } from "../modes/index.js";
@@ -19,6 +20,11 @@ export default function HistoryView({ history, actions }) {
       <div className="space-y-2.5">
         {history.map((h) => {
           const meta = MODES.find((m) => m.key === h.mode);
+          // a team is listed with the people in it — they're who the Wins tab credits
+          const withMembers = (name) => {
+            const members = membersOf(h, name);
+            return members.length === 1 && members[0] === name ? name : `${name} (${members.join(", ")})`;
+          };
           return (
             <div key={h.id} className="rounded-2xl p-4" style={{ backgroundColor: "#fff", border: `2px solid ${C.line}` }}>
               <div className="flex items-start justify-between gap-2">
@@ -33,7 +39,17 @@ export default function HistoryView({ history, actions }) {
                     <Trophy size={15} color={C.gold} fill={C.gold} className="flex-shrink-0" />
                     <span className="truncate">{h.champion}</span>
                   </p>
-                  <p className="text-xs mt-1.5 truncate" style={{ color: C.sub }}>{h.players.join(", ")}</p>
+                  <p className="text-xs mt-1.5" style={{ color: C.sub }}>{h.players.map(withMembers).join(", ")}</p>
+                  {h.prize && (
+                    <p className="text-xs mt-1" style={{ color: C.sub }}>
+                      Prize: <b style={{ color: C.ink }}>{h.prize}</b>
+                    </p>
+                  )}
+                  {h.chore && h.lastPlace?.length > 0 && (
+                    <p className="text-xs mt-1" style={{ color: C.sub }}>
+                      Last place forfeit: <b style={{ color: C.ink }}>{h.chore}</b> ({h.lastPlace.join(" & ")})
+                    </p>
+                  )}
                   {h.topScorer && (
                     <p className="text-xs mt-1 truncate" style={{ color: C.sub }}>
                       Top scorer: <b style={{ color: C.ink }}>{h.topScorer.name}</b> ({h.topScorer.goals}) · {h.totalGoals} goals total

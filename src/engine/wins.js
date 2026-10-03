@@ -1,4 +1,8 @@
-/* One row per distinct player name across every finished tournament.
+import { membersOf } from "./teams.js";
+
+/* One row per distinct person across every finished tournament. A team's
+   titles and results are credited to each of its members (see
+   engine/teams.js), never to the team's own name.
    History is newest-first, so the first spelling seen is the current one. */
 export function computeWinsTable(history) {
   const rows = new Map(); // key: name.trim().toLowerCase() -> row
@@ -15,26 +19,30 @@ export function computeWinsTable(history) {
   };
 
   history.forEach((record) => {
+    const people = (name) => membersOf(record, name);
+
     (record.players || []).forEach((name) => {
       if (!name) return;
-      rowFor(name).entered++;
+      people(name).forEach((person) => { rowFor(person).entered++; });
     });
 
     // ensure a row even if the champion isn't in `players` — defensive,
     // for hand-edited or older imported data
-    if (record.champion) rowFor(record.champion).titles++;
+    if (record.champion) people(record.champion).forEach((person) => { rowFor(person).titles++; });
 
     // step B only: older records have no `results` at all, which is "no
     // data", not "zero wins" — hasResults tells the view the difference
     if (Array.isArray(record.results)) {
       record.results.forEach((r) => {
         if (!r || !r.name) return;
-        const row = rowFor(r.name);
-        row.played += Number(r.played) || 0;
-        row.w += Number(r.w) || 0;
-        row.d += Number(r.d) || 0;
-        row.l += Number(r.l) || 0;
-        row.hasResults = true;
+        people(r.name).forEach((person) => {
+          const row = rowFor(person);
+          row.played += Number(r.played) || 0;
+          row.w += Number(r.w) || 0;
+          row.d += Number(r.d) || 0;
+          row.l += Number(r.l) || 0;
+          row.hasResults = true;
+        });
       });
     }
   });

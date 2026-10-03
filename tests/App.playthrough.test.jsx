@@ -614,3 +614,111 @@ describe("loading a v1 saved blob (schema migration)", () => {
     expect(screen.getByText("Bob")).toBeInTheDocument();
   });
 });
+
+describe("Slow-play card", () => {
+  it("needs two taps, takes a goal off the carded player, then gives the opponent one", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("Pure League");
+    clickText("1");
+    clickText("GENERATE FIXTURES");
+
+    await screen.findByText(/Fixtures/);
+    const home = homeNameOfFirstCard();
+    const [homeScore, awayScore] = screen.getAllByLabelText("Add goal");
+    fireEvent.click(homeScore);
+    expect(homeScore).toHaveTextContent("1");
+
+    // first tap only arms the button — the score hasn't moved
+    fireEvent.click(screen.getByLabelText(`Slow play card for ${home}`));
+    expect(homeScore).toHaveTextContent("1");
+
+    // second tap shows the card: the goal comes off
+    fireEvent.click(screen.getByLabelText(`Confirm slow play card for ${home}`));
+    expect(homeScore).toHaveTextContent("0");
+    expect(awayScore).toHaveTextContent("0");
+
+    // nothing left to take, so a second card hands the opponent a goal
+    fireEvent.click(screen.getByLabelText(`Slow play card for ${home}`));
+    fireEvent.click(screen.getByLabelText(`Confirm slow play card for ${home}`));
+    expect(homeScore).toHaveTextContent("0");
+    expect(awayScore).toHaveTextContent("1");
+    expect(screen.getByLabelText(`Slow play card for ${home}`)).toHaveTextContent("×2");
+
+    // the goal that was taken off is gone from the stats too
+    clickText("Stats");
+    expect(screen.queryByText(home)).not.toBeInTheDocument();
+  });
+});
+
+describe("Teams, a prize and a last place forfeit", () => {
+  it("credits a team's win to each of its players and records what was played for", async () => {
+    render(<App />);
+    clickText("Team");
+    fireEvent.change(screen.getByPlaceholderText("Team name"), { target: { value: "Tigers" } });
+    fireEvent.change(screen.getByPlaceholderText(/Who's in it/), { target: { value: "Sam, Ali" } });
+    clickText("ADD TEAM (2 PLAYERS)");
+    clickText("Player");
+    addPlayer("Zak");
+    expect(screen.getByText("Players (2)")).toBeInTheDocument();
+    expect(screen.getByText("Sam, Ali")).toBeInTheDocument();
+
+    clickText("No homework tonight");
+    clickText("Set the table");
+    clickText("Pure League");
+    clickText("1");
+    clickText("GENERATE FIXTURES");
+    await screen.findByText(/Fixtures/);
+
+    // the stakes are on show while it's still being played
+    expect(screen.getByText(/Champion's prize:/)).toBeInTheDocument();
+
+    const tigersAtHome = homeNameOfFirstCard() === "Tigers";
+    fireEvent.click(screen.getAllByLabelText("Add goal")[tigersAtHome ? 0 : 1]);
+    clickText("Mark played");
+
+    clickText("Table");
+    expect(await screen.findByText("Champion")).toBeInTheDocument();
+    expect(screen.getByText(/wins the trophy and the prize/)).toBeInTheDocument();
+    expect(screen.getByText(/Last place forfeit for/)).toBeInTheDocument();
+
+    // the title goes to the people, not to the team's name
+    clickText("Wins");
+    const winsTable = screen.getByRole("table");
+    expect(within(winsTable).getByText("Sam")).toBeInTheDocument();
+    expect(within(winsTable).getByText("Ali")).toBeInTheDocument();
+    expect(within(winsTable).queryByText("Tigers")).not.toBeInTheDocument();
+
+    // the history record is the export file, so this is what gets exported
+    const [record] = JSON.parse(localStorage.getItem("gardenCup:history"));
+    expect(record).toMatchObject({
+      champion: "Tigers",
+      teams: { Tigers: ["Sam", "Ali"] },
+      prize: "No homework tonight",
+      chore: "Set the table",
+      lastPlace: ["Zak"],
+    });
+  });
+});
+
+describe("Prize and forfeit ideas", () => {
+  it("pages through the ideas and draws a random one into the box", () => {
+    render(<App />);
+    expect(screen.getByText("Set the table")).toBeInTheDocument();
+    expect(screen.queryByText("No screen time tonight")).not.toBeInTheDocument();
+
+    const more = screen.getByLabelText("More ideas for last place forfeit");
+    for (let i = 0; i < 3; i++) fireEvent.click(more);
+    clickText("No screen time tonight");
+    expect(screen.getByLabelText("Last place forfeit")).toHaveValue("No screen time tonight");
+
+    fireEvent.click(screen.getByLabelText("Random champion's prize"));
+    const prize = screen.getByLabelText("Champion's prize").value;
+    expect(prize).not.toBe("");
+
+    // a second tap always changes it
+    fireEvent.click(screen.getByLabelText("Random champion's prize"));
+    expect(screen.getByLabelText("Champion's prize").value).not.toBe(prize);
+  });
+});

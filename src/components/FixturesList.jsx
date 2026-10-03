@@ -38,7 +38,7 @@ export default function FixturesList({ matches, legCount, nameOf, timerControls,
           </div>
           <div className="space-y-2.5">
             {visible.filter((m) => m.leg === leg).map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
             ))}
           </div>
         </div>

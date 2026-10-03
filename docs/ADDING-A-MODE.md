@@ -80,7 +80,7 @@ function MatchesView({ matches, nameOf, champion, standings, timerControls, acti
       <div className="space-y-2.5">
         {matches.map((m) => (
           <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal}
-            onUndoGoal={actions.undoGoal} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
+            onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
         ))}
       </div>
       {playedCount < matches.length && (

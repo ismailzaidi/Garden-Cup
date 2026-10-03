@@ -55,6 +55,15 @@ describe("the twist deck", () => {
     expect(TWISTS.length).toBeGreaterThanOrEqual(30);
   });
 
+  it("has skill twists: a fake shot, two fakes in a row, and a skill finish", () => {
+    for (const key of ["fake-shot", "double-fake", "skill-goal"]) expect(TWISTS.some((t) => t.key === key)).toBe(true);
+  });
+
+  it("never reuses a retired twist's key", () => {
+    const all = [...TWISTS, ...RETIRED_TWISTS].map((t) => t.key);
+    expect(new Set(all).size).toBe(all.length);
+  });
+
   it("has unique keys, labels and emoji", () => {
     expect(new Set(TWISTS.map((t) => t.key)).size).toBe(TWISTS.length);
     expect(new Set(TWISTS.map((t) => t.label)).size).toBe(TWISTS.length);

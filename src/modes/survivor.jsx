@@ -100,7 +100,7 @@ function ArenaView({ players, matches, modeState, nameOf, champion, timerControl
           </SectionLabel>
           <div className="space-y-2.5">
             {roundMatches.map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal}
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
                 onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
             ))}
           </div>
@@ -177,6 +177,11 @@ export default {
     initialTab: "rounds",
   }),
   champion,
+  // last is whoever went out first, not the bottom of a combined table
+  lastPlace: ({ players, modeState }) => {
+    const first = (modeState.eliminated || [])[0];
+    return players.filter((p) => first && p.id === first.id);
+  },
   tabs: ({ matches }) => {
     const sm = survivorMatchesOf(matches);
     return [

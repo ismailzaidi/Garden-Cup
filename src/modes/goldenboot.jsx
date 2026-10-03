@@ -1,6 +1,7 @@
 import { Target, Crown, ChevronRight } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { generateGroupMatches } from "../engine/match.js";
+import { bottomOf } from "../engine/stakes.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import MatchCard from "../components/MatchCard.jsx";
 import SectionLabel from "../components/SectionLabel.jsx";
@@ -127,7 +128,7 @@ function RaceView({ players, matches, config, nameOf, champion, timerControls, a
           <SectionLabel>Round {leg}</SectionLabel>
           <div className="space-y-2.5">
             {gm.filter((m) => (m.leg || 1) === leg).map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal}
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
                 onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
             ))}
           </div>
@@ -162,6 +163,9 @@ export default {
     initialTab: "race",
   }),
   champion,
+  // a goal race has no points table: fewest goals is last
+  lastPlace: ({ players, matches, champion: champ }) =>
+    bottomOf(computeGoalTotals(players, bootMatchesOf(matches)), champ.id, (r) => [r.goals]),
   tabs: ({ matches }) => {
     const gm = bootMatchesOf(matches);
     const playedCount = gm.filter((m) => m.played).length;

@@ -29,7 +29,7 @@ function BracketView({ matches, nameOf, champion, timerControls, actions }) {
           </div>
           <div className="space-y-2.5">
             {rounds[rn].map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onTogglePlayed={actions.togglePlayed} needsWinner {...timerControls(m.id)} />
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onTogglePlayed={actions.togglePlayed} needsWinner {...timerControls(m.id)} />
             ))}
           </div>
         </div>

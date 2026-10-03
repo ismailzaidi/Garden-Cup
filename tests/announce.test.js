@@ -57,8 +57,9 @@ describe("resultSentence", () => {
 });
 
 describe("RESULT_TEMPLATES", () => {
-  it("has several lines, each naming the loser and winner exactly once", () => {
-    expect(RESULT_TEMPLATES.length).toBeGreaterThanOrEqual(5);
+  it("has at least 50 different lines, each naming the loser and winner exactly once", () => {
+    expect(RESULT_TEMPLATES.length).toBeGreaterThanOrEqual(50);
+    expect(new Set(RESULT_TEMPLATES).size).toBe(RESULT_TEMPLATES.length);
     for (const t of RESULT_TEMPLATES) {
       expect(t.split("{loser}")).toHaveLength(2);
       expect(t.split("{winner}")).toHaveLength(2);

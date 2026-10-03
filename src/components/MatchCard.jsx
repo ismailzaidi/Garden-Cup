@@ -1,9 +1,41 @@
+import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import { C } from "../lib/theme.js";
 import MatchTimer from "./MatchTimer.jsx";
 import GoalPanel from "./GoalPanel.jsx";
 
-export default function MatchCard({ match, nameOf, onAddGoal, onUndoGoal, onTogglePlayed, timer, onStart, onPause, onReset, onSetDuration, needsWinner, homeTag, awayTag, hideToggle }) {
+const CARD_YELLOW = "#F5D90A";
+
+/* The referee's slow-play card (engine/cards.js). Two taps on purpose: it
+   changes the score, and a thumb aiming for the goal button mustn't cost
+   anyone a goal. The first tap arms it, the second shows the card, and it
+   disarms by itself if nobody follows through. */
+function CardButton({ name, count, onCard }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return undefined;
+    const t = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  const tap = () => {
+    if (!armed) { setArmed(true); return; }
+    setArmed(false);
+    onCard();
+  };
+
+  return (
+    <button onClick={tap}
+      aria-label={armed ? `Confirm slow play card for ${name}` : `Slow play card for ${name}`}
+      className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-wide whitespace-nowrap active:scale-95 transition-transform"
+      style={{ backgroundColor: armed ? CARD_YELLOW : "#33452F", color: armed ? C.ink : "#9AAE94" }}>
+      <span className="rounded-sm flex-shrink-0" style={{ width: 7, height: 10, backgroundColor: armed ? C.ink : CARD_YELLOW }} />
+      {armed ? "Sure?" : count > 0 ? `×${count}` : "Card"}
+    </button>
+  );
+}
+
+export default function MatchCard({ match, nameOf, onAddGoal, onUndoGoal, onCard, onTogglePlayed, timer, onStart, onPause, onReset, onSetDuration, needsWinner, homeTag, awayTag, hideToggle }) {
   if (match.bye) {
     return (
       <div className="rounded-2xl p-4 flex items-center justify-between gap-2" style={{ backgroundColor: "#EAE6D9", border: `2px dashed #C9C2AC` }}>
@@ -47,6 +79,7 @@ export default function MatchCard({ match, nameOf, onAddGoal, onUndoGoal, onTogg
           {homeTag && <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: C.gold }}>{homeTag}</p>}
           <p className="truncate font-semibold" style={{ color: "#F7F5EE" }}>{nameOf(match.p1)}</p>
           <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#5C6B57" }}>Home</p>
+          {onCard && <CardButton name={nameOf(match.p1)} count={Number(match.c1 || 0)} onCard={() => onCard(match.id, "s1")} />}
         </div>
         <GoalPanel score={s1} onAdd={() => onAddGoal(match.id, "s1")} onUndo={() => onUndoGoal(match.id, "s1")} />
         <span className="flex-shrink-0" style={{ color: "#5C6B57", fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.1rem" }}>VS</span>
@@ -55,6 +88,7 @@ export default function MatchCard({ match, nameOf, onAddGoal, onUndoGoal, onTogg
           {awayTag && <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: C.gold }}>{awayTag}</p>}
           <p className="truncate font-semibold" style={{ color: "#F7F5EE" }}>{nameOf(match.p2)}</p>
           <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#5C6B57" }}>Away</p>
+          {onCard && <CardButton name={nameOf(match.p2)} count={Number(match.c2 || 0)} onCard={() => onCard(match.id, "s2")} />}
         </div>
       </div>
 
