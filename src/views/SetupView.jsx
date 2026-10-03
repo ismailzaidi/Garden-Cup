@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Plus, X, Target } from "lucide-react";
+import { Plus, X, Target, Dices } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { MODES } from "../modes/index.js";
 import { parseMembers } from "../engine/teams.js";
-import { PRIZE_IDEAS, CHORE_IDEAS } from "../engine/stakes.js";
+import { PRIZE_IDEAS, FORFEIT_IDEAS, randomIdea } from "../engine/stakes.js";
 import SectionLabel from "../components/SectionLabel.jsx";
 
 const inputStyle = { backgroundColor: "#fff", border: `2px solid ${C.line}`, color: C.ink };
@@ -12,15 +12,34 @@ const inputClass = "w-full min-w-0 rounded-xl px-4 py-3 text-sm font-medium outl
 /* One line of what's being played for (engine/stakes.js): free text, with a
    row of one-tap ideas. Locked once fixtures exist, like the mode pickers —
    the stakes are agreed before kick-off, not renegotiated at 3-0 down. */
+const IDEAS_SHOWN = 6;
+const pillStyle = { backgroundColor: "#EAE6D9", color: C.ink };
+
 function StakeField({ label, value, placeholder, ideas, locked, onChange }) {
+  // the lists are long, so the chips show a page at a time
+  const [page, setPage] = useState(0);
+  const pages = Math.ceil(ideas.length / IDEAS_SHOWN);
+  const shown = ideas.slice(page * IDEAS_SHOWN, (page + 1) * IDEAS_SHOWN);
+
   return (
     <div>
-      <SectionLabel>{label}</SectionLabel>
+      <SectionLabel right={!locked && (
+        <div className="flex gap-1">
+          <button onClick={() => onChange(randomIdea(ideas, value))} aria-label={`Random ${label.toLowerCase()}`}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ backgroundColor: C.gold, color: C.ink }}>
+            <Dices size={12} /> Random
+          </button>
+          <button onClick={() => setPage((p) => (p + 1) % pages)} aria-label={`More ideas for ${label.toLowerCase()}`}
+            className="px-2.5 py-1 rounded-full text-[11px] font-bold" style={pillStyle}>
+            More ideas
+          </button>
+        </div>
+      )}>{label}</SectionLabel>
       <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} maxLength={40} disabled={locked}
         aria-label={label} className={inputClass} style={inputStyle} />
       {!locked && (
         <div className="flex flex-wrap gap-1.5 mt-2">
-          {ideas.map((idea) => (
+          {shown.map((idea) => (
             <button key={idea} onClick={() => onChange(value === idea ? "" : idea)} className="px-2.5 py-1 rounded-full text-[11px] font-semibold"
               style={{ backgroundColor: value === idea ? C.pitch : "#EAE6D9", color: value === idea ? "#F7F5EE" : C.ink }}>
               {idea}
@@ -100,7 +119,7 @@ export default function SetupView({ players, nameInput, mode, config, matches, a
 
       <StakeField label="Champion's prize" value={stakes.prize} placeholder="e.g. No homework tonight" ideas={PRIZE_IDEAS}
         locked={matches.length > 0} onChange={(v) => actions.setStake("prize", v)} />
-      <StakeField label="Last place job" value={stakes.chore} placeholder="e.g. Set the table" ideas={CHORE_IDEAS}
+      <StakeField label="Last place forfeit" value={stakes.chore} placeholder="e.g. Set the table" ideas={FORFEIT_IDEAS}
         locked={matches.length > 0} onChange={(v) => actions.setStake("chore", v)} />
 
       <div>

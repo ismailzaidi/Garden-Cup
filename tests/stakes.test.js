@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { bottomOf, lastOfTable, lastPlaceOf } from "../src/engine/stakes.js";
+import { bottomOf, lastOfTable, lastPlaceOf, randomIdea, PRIZE_IDEAS, FORFEIT_IDEAS } from "../src/engine/stakes.js";
 import horror from "../src/modes/horror.jsx";
 import goldenboot from "../src/modes/goldenboot.jsx";
 import survivor from "../src/modes/survivor.jsx";
@@ -69,5 +69,34 @@ describe("lastPlaceOf", () => {
     const ps = players(3);
     const modeState = { alive: ["p0"], eliminated: [{ id: "p2", round: 1 }, { id: "p1", round: 2 }] };
     expect(ids(lastPlaceOf(survivor, { players: ps, matches: [], config: {}, modeState, champion: ps[0] }))).toEqual(["p2"]);
+  });
+});
+
+describe("the idea lists", () => {
+  it("offer plenty of prizes and forfeits, with no repeats", () => {
+    expect(PRIZE_IDEAS.length).toBeGreaterThanOrEqual(20);
+    expect(FORFEIT_IDEAS.length).toBeGreaterThanOrEqual(25);
+    expect(new Set(PRIZE_IDEAS).size).toBe(PRIZE_IDEAS.length);
+    expect(new Set(FORFEIT_IDEAS).size).toBe(FORFEIT_IDEAS.length);
+  });
+
+  it("all fit the 40-character box on the setup screen", () => {
+    expect([...PRIZE_IDEAS, ...FORFEIT_IDEAS].filter((idea) => idea.length > 40)).toEqual([]);
+  });
+});
+
+describe("randomIdea", () => {
+  it("can reach every idea", () => {
+    const n = FORFEIT_IDEAS.length;
+    const drawn = new Set(FORFEIT_IDEAS.map((_, i) => randomIdea(FORFEIT_IDEAS, "", () => (i + 0.5) / n)));
+    expect(drawn.size).toBe(n);
+  });
+
+  it("never returns the idea already chosen", () => {
+    for (let i = 0; i < 20; i++) expect(randomIdea(["a", "b"], "a", () => i / 20)).toBe("b");
+  });
+
+  it("keeps the current value when there is nothing else to pick", () => {
+    expect(randomIdea(["a"], "a")).toBe("a");
   });
 });

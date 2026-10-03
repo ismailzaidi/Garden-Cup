@@ -30,8 +30,8 @@ export default function StakesCard({ stakes, champion, lastPlace }) {
           <Sparkles size={15} className="flex-shrink-0 mt-0.5" color={C.pitch} />
           <span>
             {lastNames.length > 0
-              ? <>Last place job for <b style={{ color: C.ink }}>{joinNames(lastNames)}</b>: </>
-              : "Last place job: "}
+              ? <>Last place forfeit for <b style={{ color: C.ink }}>{joinNames(lastNames)}</b>: </>
+              : "Last place forfeit: "}
             <b style={{ color: C.ink }}>{chore}</b>
           </span>
         </p>

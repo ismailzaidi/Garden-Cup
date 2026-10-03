@@ -101,6 +101,21 @@ export const TWISTS = [
   { key: "opposite-day", emoji: "🙃", label: "Opposite day", detail: "Say the opposite of what you mean all match: \"terrible goal!\"" },
   { key: "lucky-ritual", emoji: "🍀", label: "Lucky ritual", detail: "Invent a lucky ritual and do it before every shot. Forget it and the shot is void." },
   { key: "accessory-stack", emoji: "🧣", label: "Accessory stack", detail: "Every time you score, add a silly item to wear: scarf, sock on hand, hat." },
+
+  // ── Fakes, feints & skill moves ──
+  { key: "fake-shot", emoji: "🎭", label: "Fake shot first", detail: "Sell a fake shot before every real one. No fake, no goal." },
+  { key: "double-fake", emoji: "🪄", label: "Double fake", detail: "Two fake shots in a row, then shoot. Skip one and the goal doesn't count." },
+  { key: "skill-goal", emoji: "✨", label: "Skill goal", detail: "A goal only counts if the finish is a skill: back-heel, volley, chip or rabona." },
+  { key: "stepover", emoji: "🦵", label: "Stepover first", detail: "Two stepovers before every shot. No stepovers, no goal." },
+  { key: "body-feint", emoji: "💃", label: "Body feint", detail: "Drop your shoulder one way and go the other before you shoot." },
+  { key: "drag-back", emoji: "↩️", label: "Drag-back first", detail: "Pull the ball back with your sole, then shoot." },
+  { key: "roulette", emoji: "🎠", label: "Roulette", detail: "Spin right over the ball, a full 360, before you shoot." },
+  { key: "scissors", emoji: "✂️", label: "Scissors", detail: "One scissors move over the ball before every shot." },
+  { key: "sole-roll", emoji: "🛞", label: "Sole roll", detail: "Roll the ball across your body with your sole, then finish with the other foot." },
+  { key: "fake-pass", emoji: "👀", label: "Fake pass", detail: "Shape to pass, keep the ball instead, then shoot." },
+  { key: "stop-go", emoji: "🛑", label: "Stop and go", detail: "Stop the ball dead, then burst away before you shoot." },
+  { key: "beat-player", emoji: "🧙", label: "Beat your player", detail: "You must dribble past your opponent before you're allowed to shoot." },
+  { key: "skill-chain", emoji: "🔗", label: "Skill chain", detail: "Link two different skills before you shoot: a stepover then a drag-back, anything." },
 ];
 
 /* Twists taken out of the deck. They are never dealt again, but saved

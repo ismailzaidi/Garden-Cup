@@ -28,7 +28,14 @@
  */
 import { shuffle } from "./match.js";
 
-export const FATES = ["normal", "reverse", "void", "both-lose", "truce", "double", "pity", "drain"];
+export const FATES = [
+  "normal", "reverse", "void", "both-lose", "truce", "double", "pity", "drain",
+  // the No Mercy fates — see the "No Mercy deck" rules below
+  "draw6", "draw10", "wipeout", "skip-all", "swap", "rotate",
+];
+
+// "wipeout" only bites on a loss by this many goals or more
+const WIPEOUT_MARGIN = 3;
 
 export const FATE_VERDICT = {
   reverse: "☠️ The winner actually LOST. The loser takes the points.",
@@ -38,6 +45,12 @@ export const FATE_VERDICT = {
   double: "🌑 The winner powers up: double points.",
   pity: "😢 The loser was pitied: they get 3 points too.",
   drain: "🧛 The winner drained 3 points out of the loser.",
+  draw6: "🎴 Draw six! The loser is hit for minus 6 points.",
+  draw10: "🔟 Draw ten! The loser is hit for minus 10 points.",
+  wipeout: "🧨 Lose by 3 goals or more and it's minus 6 points. A closer loss is just a loss.",
+  "skip-all": "⛔ Skip everyone! The winner takes 3 and every other player in the tournament loses 1.",
+  swap: "🤲 Hand swap! These two players swap their whole points totals.",
+  rotate: "0️⃣ Pass your hand! Every player's points pass to the next player on the Players list.",
 };
 
 /* SECRET rules come first in the deck, OPEN rules after — purely for
@@ -92,6 +105,18 @@ export const HORROR_TWISTS = [
   { key: "black-hole", emoji: "🕳️", fate: "drain", label: "Black Hole", detail: "The loser falls into a black hole and comes out 3 points poorer." },
 
 
+  // ── The No Mercy deck: card-game cruelty, sealed ──
+  { key: "wild-draw-six", emoji: "🎴", fate: "draw6", label: "Wild Draw Six", detail: "A Draw Six lands on the loser: minus 6 points. The winner keeps their 3." },
+  { key: "stacked-draw", emoji: "🗼", fate: "draw6", label: "Stacked Draw", detail: "The +2s kept stacking and the loser could not pass them on: minus 6 points." },
+  { key: "wild-draw-ten", emoji: "🔟", fate: "draw10", label: "Wild Draw Ten", detail: "The cruellest card in the deck. The loser draws ten: minus 10 points." },
+  { key: "wipeout", emoji: "🧨", fate: "wipeout", label: "Show No Mercy", detail: "Lose by three goals or more and you are wiped out: minus 6 points. A closer loss is just a loss." },
+  { key: "skip-everyone", emoji: "⛔", fate: "skip-all", label: "Skip Everyone", detail: "The winner takes 3 points, and every other player in the tournament loses 1. Yes, even the ones who weren't playing." },
+  { key: "hand-swap", emoji: "🤲", fate: "swap", label: "Hand Swap", detail: "A seven was played. These two players swap their whole points totals, whoever won." },
+  { key: "pass-your-hand", emoji: "0️⃣", fate: "rotate", label: "Pass Your Hand", detail: "A zero was played. Every player's points pass to the next player on the Players list, and the last player's go to the first." },
+  { key: "reverse-card", emoji: "↪️", fate: "reverse", label: "Reverse Card", detail: "A reverse card is played at full time. The winner loses; the loser wins." },
+  { key: "double-draw", emoji: "🎰", fate: "drain", label: "Draw Four, Give Four", detail: "The loser hands 3 points straight to the winner: plus 3 one way, minus 3 the other." },
+
+
   // ════════ OPEN — everyone knows, act it out ════════
 
   // ── Haunted keeper ──
@@ -141,6 +166,27 @@ export const HORROR_TWISTS = [
   { key: "tombstone-wall", emoji: "🧱", fate: "normal", label: "Tombstone Wall", detail: "Free kicks are defended by kneeling like a tombstone in front of the ball." },
   { key: "eerie-silence", emoji: "🤫", fate: "normal", label: "Eerie Silence", detail: "Total silence all match. First to speak gives away a free shot." },
   { key: "ghost-whistle", emoji: "📯", fate: "normal", label: "Ghost Whistle", detail: "The referee may blow an imaginary whistle at any time. Both players freeze like statues until it blows again." },
+
+  // ── Cursed skills ──
+  { key: "phantom-shot", emoji: "👤", fate: "normal", label: "Phantom Shot", detail: "Every real shot must follow a fake one. No fake shot, no goal." },
+  { key: "double-phantom", emoji: "💨", fate: "normal", label: "Double Phantom", detail: "Two fake shots in a row before every real one. Miss one out and the goal is wiped." },
+  { key: "spellbound-goal", emoji: "🪄", fate: "normal", label: "Spellbound Goal", detail: "Goals only count if the finish is a skill: back-heel, volley, chip or rabona." },
+  { key: "skeleton-stepover", emoji: "💀", fate: "normal", label: "Skeleton Stepover", detail: "Two stepovers before every shot. Forget them and it's your opponent's ball." },
+  { key: "ghost-turn", emoji: "🌀", fate: "normal", label: "Ghost Turn", detail: "Turn away from your opponent with a drag-back or Cruyff turn before every shot." },
+  { key: "shapeshifter", emoji: "🦎", fate: "normal", label: "Shapeshifter", detail: "Drop your shoulder one way and go the other before you shoot. No feint, no goal." },
+  { key: "witchs-roulette", emoji: "🎡", fate: "normal", label: "Witch's Roulette", detail: "Spin right over the ball, a full 360, before you shoot." },
+  { key: "scissor-hands", emoji: "✂️", fate: "normal", label: "Scissor Hands", detail: "One scissors move over the ball before every shot. No scissors, no goal." },
+  { key: "poltergeist-pass", emoji: "📦", fate: "normal", label: "Poltergeist Pass", detail: "Fake a pass, keep the ball, then shoot. A shot with no fake pass is wiped." },
+  { key: "tricksters-toll", emoji: "🤹", fate: "normal", label: "Trickster's Toll", detail: "You must dribble past your opponent before you may shoot." },
+  { key: "chain-of-curses", emoji: "🔗", fate: "normal", label: "Chain of Curses", detail: "Link two different skills before every shot, or the goal is wiped." },
+
+  // ── The No Mercy deck: played in the open ──
+  { key: "stack-attack", emoji: "📈", fate: "normal", label: "Stack Attack", detail: "Goals in a row stack. Your second in a row counts as 2, your third as 3. Concede and your stack is gone." },
+  { key: "stacking-plus-two", emoji: "➕", fate: "normal", label: "Stacking +2", detail: "Concede and do 2 star jumps before you may defend. They stack: 4 next time, then 6, then 8." },
+  { key: "draw-until-you-play", emoji: "🎣", fate: "normal", label: "Draw Until You Play", detail: "Miss the target and your opponent takes free shots at your goal until they miss one." },
+  { key: "colour-roulette", emoji: "🎨", fate: "normal", label: "Colour Roulette", detail: "The scorer names a colour. The conceder must run and touch something that colour before they may defend again." },
+  { key: "discard-all", emoji: "🗑️", fate: "normal", label: "Discard All", detail: "Score twice in a row and one of your opponent's goals is thrown away." },
+  { key: "wild-card", emoji: "🌈", fate: "normal", label: "Wild Card", detail: "After every goal the scorer picks the rule for the next one: weak foot, one touch, or skill finish only." },
 
   // ── No Mercy ──
   { key: "no-mercy", emoji: "🚫", fate: "normal", label: "No Mercy", detail: "Lead by four and the match ends on the spot. The loser does a forfeit of the winner's choosing." },
@@ -217,16 +263,27 @@ export function fateOutcome(fate, s1, s2) {
   else if (fate === "double") win = { r: "w", pts: 6 };
   else if (fate === "pity") lose = { r: "l", pts: 3 };
   else if (fate === "drain") lose = { r: "l", pts: -3 };
+  else if (fate === "draw6") lose = { r: "l", pts: -6 };
+  else if (fate === "draw10") lose = { r: "l", pts: -10 };
+  else if (fate === "wipeout" && Math.abs(s1 - s2) >= WIPEOUT_MARGIN) lose = { r: "l", pts: -6 };
   return p1Won ? [win, lose] : [lose, win];
 }
 
 /* computeStandings with every result run through its horror fate. Goals,
-   goal difference and the tie-break order are untouched. */
+   goal difference and the tie-break order are untouched.
+
+   Three fates move points that aren't the two players' own result:
+   "skip-all" docks everyone else a point; "swap" and "rotate" move whole
+   totals between players. The moves are applied last, to the finished
+   totals, in fixture order — never in the order matches happened to be
+   played, which isn't recorded. So a swap is permanent: the two players
+   trade totals, including points either of them earns afterwards. */
 export function computeHorrorStandings(players, matches) {
   const table = {};
   players.forEach((p) => {
     table[p.id] = { id: p.id, name: p.name, played: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0 };
   });
+  const moves = [];
   matches.forEach((m) => {
     if (!m.played || m.bye) return;
     const s1 = Number(m.s1 || 0);
@@ -237,11 +294,22 @@ export function computeHorrorStandings(players, matches) {
     a.played++; b.played++;
     a.gf += s1; a.ga += s2;
     b.gf += s2; b.ga += s1;
-    const [oa, ob] = fateOutcome(horrorOf(m.twist)?.fate ?? "normal", s1, s2);
+    const fate = horrorOf(m.twist)?.fate ?? "normal";
+    const [oa, ob] = fateOutcome(fate, s1, s2);
     if (oa.r) a[oa.r]++;
     if (ob.r) b[ob.r]++;
     a.pts += oa.pts;
     b.pts += ob.pts;
+    if (fate === "skip-all" && s1 !== s2) {
+      players.forEach((p) => { if (p.id !== m.p1 && p.id !== m.p2) table[p.id].pts -= 1; });
+    }
+    if (fate === "swap" || fate === "rotate") moves.push({ fate, a, b });
+  });
+  moves.forEach(({ fate, a, b }) => {
+    if (fate === "swap") { [a.pts, b.pts] = [b.pts, a.pts]; return; }
+    // rotate: each player takes the total of the player listed before them
+    const totals = players.map((p) => table[p.id].pts);
+    players.forEach((p, i) => { table[p.id].pts = totals[(i - 1 + totals.length) % totals.length]; });
   });
   return Object.values(table).sort((x, y) => {
     if (y.pts !== x.pts) return y.pts - x.pts;

@@ -140,18 +140,26 @@ Teams are saved on each History record, so they travel in the export file
 with everything else. They are not stored by the cloud backend: signed in, a
 tournament pulled back down from the server comes back without them.
 
-## Prizes and the last place job
+## Prizes and the last place forfeit
 
 Also on the Players tab, before the fixtures are made: a **Champion's prize**
-("No homework tonight") and a **Last place job** ("Set the table"). Type your
-own or tap a suggestion; leave either blank to play for nothing. Both are
+("No homework tonight") and a **Last place forfeit** ("Set the table"). Type your
+own, tap a suggestion (**More ideas** pages through them — the forfeits run
+from chores to workouts to punishments like no screen time), or tap
+**Random** to let the app draw one; leave either blank to play for nothing.
+Both are
 locked once the fixtures exist, shown above the matches while the tournament
 is played, and awarded by name when there's a champion. Players level at the
-bottom share the job. Both are written on the History record.
+bottom share the forfeit. Both are written on the History record.
 
 ## Horror mode has no mercy
 
-The Horror deck deals 76 rules. Rules that handed the loser points or a way
+The Horror deck deals 102 rules. Eleven are skill rules (a fake shot before
+every real one, two fakes in a row, skill finishes only). Fifteen are a No
+Mercy deck borrowed from the card game: sealed rules that hit the loser for
+minus 6 or minus 10, swap two players' whole points totals, pass everyone's
+points down the Players list, or dock every player who wasn't even in the
+match — and open rules where goals, star jumps and free shots stack. Rules that handed the loser points or a way
 back in, and rules that made players make noises, put on a voice or tell a
 story, are retired: never dealt again, but still shown on a saved tournament
 that was dealt one (`RETIRED_HORRORS` in `src/engine/horror.js`).

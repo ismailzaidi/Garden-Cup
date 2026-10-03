@@ -652,7 +652,7 @@ describe("Slow-play card", () => {
   });
 });
 
-describe("Teams, a prize and a last place job", () => {
+describe("Teams, a prize and a last place forfeit", () => {
   it("credits a team's win to each of its players and records what was played for", async () => {
     render(<App />);
     clickText("Team");
@@ -681,7 +681,7 @@ describe("Teams, a prize and a last place job", () => {
     clickText("Table");
     expect(await screen.findByText("Champion")).toBeInTheDocument();
     expect(screen.getByText(/wins the trophy and the prize/)).toBeInTheDocument();
-    expect(screen.getByText(/Last place job for/)).toBeInTheDocument();
+    expect(screen.getByText(/Last place forfeit for/)).toBeInTheDocument();
 
     // the title goes to the people, not to the team's name
     clickText("Wins");
@@ -699,5 +699,26 @@ describe("Teams, a prize and a last place job", () => {
       chore: "Set the table",
       lastPlace: ["Zak"],
     });
+  });
+});
+
+describe("Prize and forfeit ideas", () => {
+  it("pages through the ideas and draws a random one into the box", () => {
+    render(<App />);
+    expect(screen.getByText("Set the table")).toBeInTheDocument();
+    expect(screen.queryByText("No screen time tonight")).not.toBeInTheDocument();
+
+    const more = screen.getByLabelText("More ideas for last place forfeit");
+    for (let i = 0; i < 3; i++) fireEvent.click(more);
+    clickText("No screen time tonight");
+    expect(screen.getByLabelText("Last place forfeit")).toHaveValue("No screen time tonight");
+
+    fireEvent.click(screen.getByLabelText("Random champion's prize"));
+    const prize = screen.getByLabelText("Champion's prize").value;
+    expect(prize).not.toBe("");
+
+    // a second tap always changes it
+    fireEvent.click(screen.getByLabelText("Random champion's prize"));
+    expect(screen.getByLabelText("Champion's prize").value).not.toBe(prize);
   });
 });

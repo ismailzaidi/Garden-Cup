@@ -30,7 +30,7 @@ export function useTournament() {
   const [matches, setMatches] = useState([]);
   const [goals, setGoals] = useState([]);
   const [modeState, setModeState] = useState({});
-  // the champion's prize and last place's helper job — see engine/stakes.js
+  // the champion's prize and last place's forfeit — see engine/stakes.js
   const [stakes, setStakes] = useState({ prize: "", chore: "" });
   const [tab, setTab] = useState("setup");
   const [history, setHistory] = useState([]);
@@ -230,7 +230,7 @@ export function useTournament() {
     [activeMode, players, matches, config, modeState]
   );
 
-  /* who gets the helper job — empty until there is a champion */
+  /* who gets the forfeit — empty until there is a champion */
   const lastPlace = useMemo(
     () => lastPlaceOf(activeMode, { players, matches, config, modeState, champion }),
     [activeMode, players, matches, config, modeState, champion]

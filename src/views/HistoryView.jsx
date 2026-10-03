@@ -47,7 +47,7 @@ export default function HistoryView({ history, actions }) {
                   )}
                   {h.chore && h.lastPlace?.length > 0 && (
                     <p className="text-xs mt-1" style={{ color: C.sub }}>
-                      Last place job: <b style={{ color: C.ink }}>{h.chore}</b> ({h.lastPlace.join(" & ")})
+                      Last place forfeit: <b style={{ color: C.ink }}>{h.chore}</b> ({h.lastPlace.join(" & ")})
                     </p>
                   )}
                   {h.topScorer && (
