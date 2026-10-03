@@ -92,7 +92,7 @@ function ArenaView({ players, matches, modeState, config, nameOf, champion, time
       {currentMatch && !champion && (
         <div>
           <SectionLabel>Match {currentMatch.seq}</SectionLabel>
-          <MatchCard match={currentMatch} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onTogglePlayed={actions.togglePlayed}
+          <MatchCard match={currentMatch} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard} onTogglePlayed={actions.togglePlayed}
             homeTag="KING" awayTag="CHALLENGER" hideToggle {...timerControls(currentMatch.id)} />
           <button onClick={actions.advance}
             className="w-full mt-2.5 py-3.5 rounded-xl font-bold text-sm tracking-wide active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
@@ -185,6 +185,8 @@ export default {
   icon: Crown,
   minPlayers: 2,
   stages: ["king"],
+  // no points table here, so a red card costs goals instead
+  goalStages: ["king"],
   config: {
     kingTarget: {
       type: "choice",

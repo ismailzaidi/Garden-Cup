@@ -5,7 +5,28 @@ import { formatTime } from "../engine/format.js";
 import SectionLabel from "../components/SectionLabel.jsx";
 import EmptyCard from "../components/EmptyCard.jsx";
 
-export default function StatsView({ topScorers, minuteData, quickestGoal, lastGasp, nameOf }) {
+const CARD_COLORS = { yellow: "#F5D90A", red: "#D8362B" };
+
+function CardCount({ kind, count }) {
+  return (
+    <span className="flex items-center gap-1.5 flex-shrink-0" aria-label={`${count} ${kind}`}>
+      <span className="rounded-sm" style={{ width: 9, height: 13, backgroundColor: CARD_COLORS[kind], border: `1px solid ${C.line}` }} />
+      <span className="font-extrabold w-4 text-right" style={{ fontFamily: "'JetBrains Mono', monospace", color: count > 0 ? C.ink : C.mute }}>{count}</span>
+    </span>
+  );
+}
+
+/* "Sam & Ali (2)" — everyone level on the most of one colour, or null when
+   nobody has been shown one. */
+function mostOf(cardCounts, kind) {
+  const max = Math.max(0, ...cardCounts.map((c) => c[kind]));
+  if (max === 0) return null;
+  return `${cardCounts.filter((c) => c[kind] === max).map((c) => c.name).join(" & ")} (${max})`;
+}
+
+export default function StatsView({ topScorers, minuteData, cardCounts = [], quickestGoal, lastGasp, nameOf }) {
+  const mostYellow = mostOf(cardCounts, "yellow");
+  const mostRed = mostOf(cardCounts, "red");
   return (
     <>
       <div>
@@ -26,6 +47,33 @@ export default function StatsView({ topScorers, minuteData, quickestGoal, lastGa
               </div>
             ))}
           </div>
+        )}
+      </div>
+
+      <div>
+        <SectionLabel>Cards</SectionLabel>
+        {cardCounts.length === 0 ? (
+          <EmptyCard>No cards shown yet — a clean tournament so far.</EmptyCard>
+        ) : (
+          <>
+            <div className="rounded-2xl overflow-hidden" style={{ border: `2px solid ${C.line}` }}>
+              {cardCounts.map((c, i, arr) => (
+                <div key={c.id} className="flex items-center justify-between gap-3 px-4 py-3"
+                  style={{ backgroundColor: "#fff", borderBottom: i < arr.length - 1 ? `1px solid #F0EDE2` : "none" }}>
+                  <span className="font-semibold truncate" style={{ color: C.ink }}>{c.name}</span>
+                  <div className="flex items-center gap-4">
+                    <CardCount kind="yellow" count={c.yellow} />
+                    <CardCount kind="red" count={c.red} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs mt-2" style={{ color: C.sub }}>
+              {mostYellow && <>Most yellow cards: <b style={{ color: C.ink }}>{mostYellow}</b></>}
+              {mostYellow && mostRed && " · "}
+              {mostRed && <>Most red cards: <b style={{ color: C.ink }}>{mostRed}</b></>}
+            </p>
+          </>
         )}
       </div>
 

@@ -1,7 +1,7 @@
 /* ---------- the chaos twist deck ----------
- * Shared by every mode that deals silly rules to matches (chaos, leaguechaos)
- * — it moved out of chaos.jsx the moment a second mode needed it, the same
- * way engine/bracket.js moved out of knockout.jsx.
+ * Dealt by chaos. It moved out of chaos.jsx when a second mode (the since
+ * retired leaguechaos) needed it, the same way engine/bracket.js moved out
+ * of knockout.jsx.
  *
  * Twists are real-world rules for the players, never scoring rules for the
  * app — a twist must never change how a goal counts, or the generic standings
@@ -16,6 +16,7 @@
  * is shuffled.
  */
 import { shuffle } from "./match.js";
+import { bandOf } from "./tiers.js";
 
 export const TWISTS = [
   // ── Foot & surface focus ──
@@ -201,11 +202,65 @@ export const RETIRED_TWISTS = [
   { key: "invisible-ball", emoji: "👻", label: "Invisible ball", detail: "Play one minute with an imaginary ball. Argue about goals and settle with rock-paper-scissors." },
 ];
 
+/* ---------- tiers and tips ----------
+   Tier 1 (the default) is a single easy thing to remember; tier 2 asks for a
+   move or an extra thing to keep track of; tier 3 is a hard skill, a
+   combination, or a high-stakes rule. They sit beside the deck rather than
+   on each entry so no entry has to change. A key listed here that isn't in
+   the deck is a typo, and tests/chaos.test.js says so. Retired keys fall
+   through to tier 1. */
+export const TIER_3 = new Set(["heel-flick", "double-fake", "skill-goal", "roulette", "beat-player", "skill-chain", "spoon-chip", "curl-it", "volley", "toss-volley", "juggle-shoot", "back-to-goal", "bank-shot", "nutmeg", "call-your-corner", "sudden-death", "hat-trick", "penalty-duel", "double-nothing", "jackpot"]);
+export const TIER_2 = new Set(["left-right", "trick-first", "turn-to-score", "give-and-go", "left-right-pass", "finger-count", "traffic-lights", "stepover", "drag-back", "scissors", "fake-pass", "stop-go", "body-feint", "fake-shot", "sole-roll", "ant", "count-touches", "shot-clock", "dice-roll", "keepy-start", "freeze", "rewind", "var", "long-range", "slow-motion-match", "one-arm-keeper", "flamingo-keeper", "swap-keeper", "keeper-picks", "double-trouble"]);
+export const tierOf = (key) => (TIER_3.has(key) ? 3 : TIER_2.has(key) ? 2 : 1);
+
+/* A one-line "how to do it" for the moves a child may not know yet. */
+export const TWIST_TIPS = {
+  "stepover": "Swing one foot round the ball without touching it, then push off the other way.",
+  "drag-back": "Put the sole of your foot on top of the ball and pull it back behind you.",
+  "scissors": "Cut one foot across the front of the ball, then drive away off your other foot.",
+  "roulette": "Roll the ball back with your sole, spin right round on top of it, and carry on.",
+  "body-feint": "Lean your shoulder one way, then push the ball the other way.",
+  "fake-shot": "Swing your leg back like you're about to shoot, then stop and keep the ball.",
+  "double-fake": "Do your fake shot twice, then hit the real one.",
+  "fake-pass": "Swing as if you're passing, then keep the ball and shoot instead.",
+  "stop-go": "Pin the ball still under your foot, wait a beat, then burst away.",
+  "sole-roll": "Roll the ball sideways with your sole, then shoot with your other foot.",
+  "nutmeg": "Slip the ball between your opponent's legs, then run round to collect it.",
+  "heel-flick": "Flick the ball backwards with the back of your heel.",
+  "spoon-chip": "Slide your toe under the ball and scoop it up into the air.",
+  "curl-it": "Hit the ball with the inside of your foot and brush up the side so it bends.",
+  "volley": "Let the ball drop, then hit it before it bounces.",
+  "toss-volley": "Drop the ball from your hands and kick it as it falls.",
+  "juggle-shoot": "Keep the ball up with your feet twice, then strike it before it drops.",
+  "turn-to-score": "Drag the ball back and spin away from the other player, then shoot.",
+  "back-to-goal": "Stand with your back to goal, take a touch, spin round and shoot.",
+  "skill-goal": "Finish with a back-heel, volley, chip or rabona. Pick one you can do.",
+  "skill-chain": "Link two different moves, like a stepover then a drag-back, then shoot.",
+  "beat-player": "Use a move to dribble round your opponent first, then shoot.",
+};
+export const tipOf = (key) => TWIST_TIPS[key] ?? null;
+
 export const twistOf = (key) => TWISTS.find((t) => t.key === key) ?? RETIRED_TWISTS.find((t) => t.key === key) ?? null;
 
+/* "climb": the first third of the matches draw from tier 1, the middle third
+   from tier 2, the last third from tier 3 — each tier's rules are shuffled
+   and used up before any of them comes round again. */
+function dealClimbing(count, rng) {
+  const decks = { 1: [], 2: [], 3: [] };
+  const dealt = [];
+  for (let i = 0; i < count; i++) {
+    const tier = bandOf(i, count);
+    if (decks[tier].length === 0) decks[tier] = shuffle(TWISTS.filter((t) => tierOf(t.key) === tier), rng);
+    dealt.push(decks[tier].shift().key);
+  }
+  return dealt;
+}
+
 /* Deal without repeats until the deck runs dry, then reshuffle — so a
-   tournament of ten or fewer matches never sees the same twist twice. */
-export function dealTwists(count, rng = Math.random) {
+   tournament of ten or fewer matches never sees the same twist twice.
+   `order` is "random" (the whole deck mixed) or "climb" (easy to hard). */
+export function dealTwists(count, rng = Math.random, order = "random") {
+  if (order === "climb") return dealClimbing(count, rng);
   const dealt = [];
   let deck = [];
   for (let i = 0; i < count; i++) {

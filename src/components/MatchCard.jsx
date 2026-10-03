@@ -5,12 +5,14 @@ import MatchTimer from "./MatchTimer.jsx";
 import GoalPanel from "./GoalPanel.jsx";
 
 const CARD_YELLOW = "#F5D90A";
+const CARD_RED = "#D8362B";
 
-/* The referee's slow-play card (engine/cards.js). Two taps on purpose: it
-   changes the score, and a thumb aiming for the goal button mustn't cost
-   anyone a goal. The first tap arms it, the second shows the card, and it
-   disarms by itself if nobody follows through. */
-function CardButton({ name, count, onCard }) {
+/* One of the referee's cards (engine/cards.js): the yellow slow-play card or
+   the red. Two taps on purpose: a card changes the score or the table, and a
+   thumb aiming for the goal button mustn't cost anyone a goal. The first tap
+   arms it, the second shows the card, and it disarms by itself if nobody
+   follows through. */
+function CardButton({ name, count, onCard, kind, color }) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return undefined;
@@ -26,16 +28,35 @@ function CardButton({ name, count, onCard }) {
 
   return (
     <button onClick={tap}
-      aria-label={armed ? `Confirm slow play card for ${name}` : `Slow play card for ${name}`}
-      className="mt-1.5 inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-wide whitespace-nowrap active:scale-95 transition-transform"
-      style={{ backgroundColor: armed ? CARD_YELLOW : "#33452F", color: armed ? C.ink : "#9AAE94" }}>
-      <span className="rounded-sm flex-shrink-0" style={{ width: 7, height: 10, backgroundColor: armed ? C.ink : CARD_YELLOW }} />
-      {armed ? "Sure?" : count > 0 ? `×${count}` : "Card"}
+      aria-label={armed ? `Confirm ${kind} for ${name}` : `${kind[0].toUpperCase()}${kind.slice(1)} for ${name}`}
+      className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[9px] font-bold uppercase tracking-wide whitespace-nowrap active:scale-95 transition-transform"
+      style={{ backgroundColor: armed ? color : "#33452F", color: armed ? (color === CARD_RED ? "#F7F5EE" : C.ink) : "#9AAE94" }}>
+      <span className="rounded-sm flex-shrink-0" style={{ width: 7, height: 10, backgroundColor: armed ? (color === CARD_RED ? "#F7F5EE" : C.ink) : color }} />
+      {armed ? "Sure?" : count > 0 ? `×${count}` : null}
     </button>
   );
 }
 
-export default function MatchCard({ match, nameOf, onAddGoal, onUndoGoal, onCard, onTogglePlayed, timer, onStart, onPause, onReset, onSetDuration, needsWinner, homeTag, awayTag, hideToggle }) {
+/* Both cards for one side of a match, plus a way back from a red — a red
+   docks points, which no goal button can put right. */
+function Cards({ match, side, name, align, onCard, onRedCard, onUndoRedCard }) {
+  const n = side === "s1" ? 1 : 2;
+  const reds = Number(match[`r${n}`] || 0);
+  return (
+    <div className={`mt-1.5 flex flex-wrap items-center gap-1 ${align === "right" ? "justify-end" : "justify-start"}`}>
+      {onCard && <CardButton kind="slow play card" color={CARD_YELLOW} name={name} count={Number(match[`c${n}`] || 0)} onCard={() => onCard(match.id, side)} />}
+      {onRedCard && <CardButton kind="red card" color={CARD_RED} name={name} count={reds} onCard={() => onRedCard(match.id, side)} />}
+      {onUndoRedCard && reds > 0 && (
+        <button onClick={() => onUndoRedCard(match.id, side)} aria-label={`Undo red card for ${name}`}
+          className="text-[9px] font-bold uppercase tracking-wide underline" style={{ color: "#9AAE94" }}>
+          Undo red
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function MatchCard({ match, nameOf, onAddGoal, onUndoGoal, onCard, onRedCard, onUndoRedCard, onTogglePlayed, timer, onStart, onPause, onReset, onSetDuration, needsWinner, homeTag, awayTag, hideToggle }) {
   if (match.bye) {
     return (
       <div className="rounded-2xl p-4 flex items-center justify-between gap-2" style={{ backgroundColor: "#EAE6D9", border: `2px dashed #C9C2AC` }}>
@@ -79,7 +100,7 @@ export default function MatchCard({ match, nameOf, onAddGoal, onUndoGoal, onCard
           {homeTag && <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: C.gold }}>{homeTag}</p>}
           <p className="truncate font-semibold" style={{ color: "#F7F5EE" }}>{nameOf(match.p1)}</p>
           <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#5C6B57" }}>Home</p>
-          {onCard && <CardButton name={nameOf(match.p1)} count={Number(match.c1 || 0)} onCard={() => onCard(match.id, "s1")} />}
+          <Cards match={match} side="s1" name={nameOf(match.p1)} align="right" onCard={onCard} onRedCard={onRedCard} onUndoRedCard={onUndoRedCard} />
         </div>
         <GoalPanel score={s1} onAdd={() => onAddGoal(match.id, "s1")} onUndo={() => onUndoGoal(match.id, "s1")} />
         <span className="flex-shrink-0" style={{ color: "#5C6B57", fontFamily: "'Bebas Neue', sans-serif", fontSize: "1.1rem" }}>VS</span>
@@ -88,7 +109,7 @@ export default function MatchCard({ match, nameOf, onAddGoal, onUndoGoal, onCard
           {awayTag && <p className="text-[9px] font-bold uppercase tracking-wider mb-0.5" style={{ color: C.gold }}>{awayTag}</p>}
           <p className="truncate font-semibold" style={{ color: "#F7F5EE" }}>{nameOf(match.p2)}</p>
           <p className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "#5C6B57" }}>Away</p>
-          {onCard && <CardButton name={nameOf(match.p2)} count={Number(match.c2 || 0)} onCard={() => onCard(match.id, "s2")} />}
+          <Cards match={match} side="s2" name={nameOf(match.p2)} align="left" onCard={onCard} onRedCard={onRedCard} onUndoRedCard={onUndoRedCard} />
         </div>
       </div>
 

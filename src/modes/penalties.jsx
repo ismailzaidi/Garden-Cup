@@ -40,7 +40,7 @@ function ShootoutView({ matches, config, nameOf, champion, timerControls, action
           </div>
           <div className="space-y-2.5">
             {rounds[rn].map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard}
                 onTogglePlayed={actions.togglePlayed} needsWinner {...timerControls(m.id)} />
             ))}
           </div>
@@ -65,6 +65,8 @@ export default {
   icon: Goal,
   minPlayers: 2,
   stages: ["pens"],
+  // no points table here, so a red card costs goals instead
+  goalStages: ["pens"],
   config: {
     pensEach: { type: "choice", label: "Penalties per player", options: [3, 5], default: DEFAULT_PENS },
   },

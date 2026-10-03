@@ -18,6 +18,9 @@ export function computeStandings(players, matches) {
     if (s1 > s2) { a.w++; b.l++; a.pts += 3; }
     else if (s2 > s1) { b.w++; a.l++; b.pts += 3; }
     else { a.d++; b.d++; a.pts += 1; b.pts += 1; }
+    // red cards (engine/cards.js) — docked once the match counts at all
+    a.pts -= Number(m.d1 || 0);
+    b.pts -= Number(m.d2 || 0);
   });
   return Object.values(table).sort((x, y) => {
     if (y.pts !== x.pts) return y.pts - x.pts;
@@ -33,6 +36,20 @@ export function computeTopScorers(players, goals) {
   players.forEach((p) => { counts[p.id] = { id: p.id, name: p.name, goals: 0 }; });
   goals.forEach((g) => { if (counts[g.playerId]) counts[g.playerId].goals++; });
   return Object.values(counts).filter((c) => c.goals > 0).sort((a, b) => b.goals - a.goals);
+}
+
+/* Yellow and red cards per player, off the counts a card leaves on its match
+   (c1/c2, r1/r2 — see engine/cards.js). Only players who were shown one,
+   most reds first, then most yellows. */
+export function computeCardCounts(players, matches) {
+  const counts = {};
+  players.forEach((p) => { counts[p.id] = { id: p.id, name: p.name, yellow: 0, red: 0 }; });
+  matches.forEach((m) => {
+    if (counts[m.p1]) { counts[m.p1].yellow += Number(m.c1 || 0); counts[m.p1].red += Number(m.r1 || 0); }
+    if (counts[m.p2]) { counts[m.p2].yellow += Number(m.c2 || 0); counts[m.p2].red += Number(m.r2 || 0); }
+  });
+  return Object.values(counts).filter((c) => c.yellow + c.red > 0)
+    .sort((a, b) => b.red - a.red || b.yellow - a.yellow || a.name.localeCompare(b.name));
 }
 
 export function computeMinuteBuckets(goals) {

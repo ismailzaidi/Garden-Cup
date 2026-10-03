@@ -3,7 +3,7 @@ import { bottomOf, lastOfTable, lastPlaceOf, randomIdea, PRIZE_IDEAS, FORFEIT_ID
 import horror from "../src/modes/horror.jsx";
 import goldenboot from "../src/modes/goldenboot.jsx";
 import survivor from "../src/modes/survivor.jsx";
-import roundrobin from "../src/modes/roundrobin.jsx";
+import league from "../src/modes/league.jsx";
 import { HORROR_TWISTS } from "../src/engine/horror.js";
 
 const players = (n) => Array.from({ length: n }, (_, i) => ({ id: `p${i}`, name: `P${i}` }));
@@ -33,13 +33,13 @@ describe("bottomOf / lastOfTable", () => {
 describe("lastPlaceOf", () => {
   it("is empty until there is a champion", () => {
     const ps = players(3);
-    expect(lastPlaceOf(roundrobin, { players: ps, matches: [], config: {}, modeState: {}, champion: null })).toEqual([]);
+    expect(lastPlaceOf(league, { players: ps, matches: [], config: {}, modeState: {}, champion: null })).toEqual([]);
   });
 
   it("uses the table of every match for a mode with no rule of its own", () => {
     const ps = players(3);
     const matches = [played("p0", "p1", 2, 0), played("p0", "p2", 3, 0), played("p1", "p2", 1, 0)];
-    expect(ids(lastPlaceOf(roundrobin, { players: ps, matches, config: {}, modeState: {}, champion: ps[0] }))).toEqual(["p2"]);
+    expect(ids(lastPlaceOf(league, { players: ps, matches, config: {}, modeState: {}, champion: ps[0] }))).toEqual(["p2"]);
   });
 
   it("horror: last on the table after the fates, not on the pitch", () => {

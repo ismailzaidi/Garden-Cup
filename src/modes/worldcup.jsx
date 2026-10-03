@@ -112,7 +112,7 @@ function GroupsView({ players, matches, modeState, nameOf, timerControls, action
             <StandingsTable standings={groupStandings(players, matches, modeState, key)} highlightTopN={2} qualifyLabel="SEMI" />
             <div className="space-y-2.5">
               {gm.map((m) => (
-                <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
+                <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard}
                   onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
               ))}
             </div>
@@ -146,7 +146,7 @@ function KnockoutSection({ title, matches, nameOf, timerControls, actions }) {
       </div>
       <div className="space-y-2.5">
         {matches.map((m) => (
-          <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
+          <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard}
             onTogglePlayed={actions.togglePlayed} needsWinner {...timerControls(m.id)} />
         ))}
       </div>
@@ -205,6 +205,8 @@ export default {
   icon: Globe,
   minPlayers: 4,
   stages: ["wcgroup", "wcko"],
+  // no points table here, so a red card costs goals instead
+  goalStages: ["wcko"],
   config: {
     groupLegs: { type: "choice", label: "Group games between each pair", options: [1, 2], default: DEFAULT_LEGS },
     wcFinalLegs: { type: "choice", label: "The final", options: [1, 3], default: DEFAULT_FINAL_LEGS, format: (n) => `Best of ${n}` },

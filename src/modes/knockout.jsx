@@ -29,7 +29,7 @@ function BracketView({ matches, nameOf, champion, timerControls, actions }) {
           </div>
           <div className="space-y-2.5">
             {rounds[rn].map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onTogglePlayed={actions.togglePlayed} needsWinner {...timerControls(m.id)} />
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard} onTogglePlayed={actions.togglePlayed} needsWinner {...timerControls(m.id)} />
             ))}
           </div>
         </div>
@@ -51,6 +51,8 @@ export default {
   icon: Swords,
   minPlayers: 2,
   stages: ["knockout"],
+  // no points table here, so a red card costs goals instead
+  goalStages: ["knockout"],
   config: {},
   summary: ({ players }) => (
     <><b style={{ color: C.ink }}>{players.length} players</b> shuffled into a random bracket — byes handed out automatically.</>

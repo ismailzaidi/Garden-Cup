@@ -15,8 +15,11 @@
  * roasts, insults, shame or humiliation forfeits, devils, souls, blood or
  * death played straight — tests/horror.test.js scans the wording for it.
  *
- * The mode has no mercy, and it is not a performance. Two kinds of rule do
- * not belong in the deck, and tests/horror.test.js holds the line on both:
+ * The mode has no mercy, and it is not a performance. Three kinds of rule do
+ * not belong in the deck, and tests/horror.test.js holds the line on all:
+ *  - nothing that leaves a decided match with no winning side (the "void"
+ *    and "both-lose" fates, kept in FATES for saved matches only) — a rule
+ *    may change who the winner is, never whether there is one;
  *  - nothing that hands the loser points or a way back in (the "pity" fate
  *    still exists in FATES, but only for saved matches — nothing live uses it);
  *  - nothing that asks a player to make noises, put on a voice, give a
@@ -27,6 +30,8 @@
  * unknown key — retire a rule by moving it to RETIRED_HORRORS at the bottom.
  */
 import { shuffle } from "./match.js";
+import { TWIST_TIPS } from "./twists.js";
+import { bandOf } from "./tiers.js";
 
 export const FATES = [
   "normal", "reverse", "void", "both-lose", "truce", "double", "pity", "drain",
@@ -67,20 +72,6 @@ export const HORROR_TWISTS = [
   { key: "monkeys-paw", emoji: "🐒", fate: "reverse", label: "Monkey's Paw", detail: "You wished to win. The paw granted it… by making you lose." },
   { key: "evil-twin", emoji: "👯", fate: "reverse", label: "Evil Twin", detail: "The players' evil twins secretly played instead. The winner's twin lost on their behalf." },
   { key: "trick-not-treat", emoji: "🎃", fate: "reverse", label: "Trick, Not Treat", detail: "The winner thinks they got a treat. It was a trick: the result is reversed." },
-
-  // ── Cursed results: it never happened ──
-  { key: "ghost-match", emoji: "👻", fate: "void", label: "Ghost Match", detail: "This match was played by ghosts. It never happened. Nobody gets any points." },
-  { key: "all-a-dream", emoji: "💤", fate: "void", label: "It Was All a Dream", detail: "Everyone wakes up in a cold sweat. None of it happened. No points for anyone." },
-  { key: "memory-wipe", emoji: "🧠", fate: "void", label: "Memory Wipe", detail: "The referee wipes everyone's memory at full time. The match doesn't count." },
-  { key: "burial-ground", emoji: "🏰", fate: "void", label: "Haunted Castle", detail: "This match was played in a haunted castle. The ghosts hid the result: no points." },
-  { key: "the-fog", emoji: "🌫️", fate: "void", label: "The Fog", detail: "The fog rolled in and nobody saw a thing. Result void." },
-
-  // ── Cursed results: the monsters get everyone ──
-  { key: "devils-pact", emoji: "🧙", fate: "both-lose", label: "The Witch's Spell", detail: "A mischievous witch put a spell on both players. Both lose, whatever the score." },
-  { key: "haunted-house", emoji: "🏚️", fate: "both-lose", label: "Haunted House", detail: "Nobody escapes the haunted house. Both players take the loss." },
-  { key: "quicksand", emoji: "⏳", fate: "both-lose", label: "Quicksand", detail: "The pitch was quicksand all along. Both players sank. Both lose." },
-  { key: "double-curse", emoji: "🧿", fate: "both-lose", label: "A Curse on Both Your Houses", detail: "The witch cursed you both. Both players lose this match." },
-  { key: "swamp-monster", emoji: "🐊", fate: "both-lose", label: "Swamp Monster", detail: "The swamp monster chased both players off the pitch at full time. Both lose." },
 
   // ── Cursed results: the spirits want peace ──
   { key: "full-moon-truce", emoji: "🌕", fate: "truce", label: "Full Moon Truce", detail: "Under the full moon, a draw is worth 3 points each. A win is worth only 1." },
@@ -219,6 +210,18 @@ export const RETIRED_HORRORS = [
   { key: "creepy-doll", emoji: "🧸", fate: "normal", label: "Creepy Doll", detail: "Talk like a creepy doll whenever you have the ball: \"Play with meeee…\"" },
   { key: "last-words", emoji: "💬", fate: "normal", label: "Spooky Catchphrase", detail: "Before every shot, shout your spooky catchphrase." },
 
+  // ── Nobody won: a match with one of these left no winning side ──
+  { key: "ghost-match", emoji: "👻", fate: "void", label: "Ghost Match", detail: "This match was played by ghosts. It never happened. Nobody gets any points." },
+  { key: "all-a-dream", emoji: "💤", fate: "void", label: "It Was All a Dream", detail: "Everyone wakes up in a cold sweat. None of it happened. No points for anyone." },
+  { key: "memory-wipe", emoji: "🧠", fate: "void", label: "Memory Wipe", detail: "The referee wipes everyone's memory at full time. The match doesn't count." },
+  { key: "burial-ground", emoji: "🏰", fate: "void", label: "Haunted Castle", detail: "This match was played in a haunted castle. The ghosts hid the result: no points." },
+  { key: "the-fog", emoji: "🌫️", fate: "void", label: "The Fog", detail: "The fog rolled in and nobody saw a thing. Result void." },
+  { key: "devils-pact", emoji: "🧙", fate: "both-lose", label: "The Witch's Spell", detail: "A mischievous witch put a spell on both players. Both lose, whatever the score." },
+  { key: "haunted-house", emoji: "🏚️", fate: "both-lose", label: "Haunted House", detail: "Nobody escapes the haunted house. Both players take the loss." },
+  { key: "quicksand", emoji: "⏳", fate: "both-lose", label: "Quicksand", detail: "The pitch was quicksand all along. Both players sank. Both lose." },
+  { key: "double-curse", emoji: "🧿", fate: "both-lose", label: "A Curse on Both Your Houses", detail: "The witch cursed you both. Both players lose this match." },
+  { key: "swamp-monster", emoji: "🐊", fate: "both-lose", label: "Swamp Monster", detail: "The swamp monster chased both players off the pitch at full time. Both lose." },
+
   // ── Mercy: the loser was handed points, or a way back in ──
   { key: "sympathy-ghost", emoji: "🫂", fate: "pity", label: "Sympathy Ghost", detail: "The ghosts felt sorry for the loser. The loser gets 3 points too." },
   { key: "haunted-trophy", emoji: "🎗️", fate: "pity", label: "Haunted Participation Trophy", detail: "Everyone's a winner… spookily. The loser also gets 3 points." },
@@ -234,13 +237,64 @@ export const isSecret = (twist) => twist.fate !== "normal";
 
 export const horrorOf = (key) => HORROR_TWISTS.find((t) => t.key === key) ?? RETIRED_HORRORS.find((t) => t.key === key) ?? null;
 
-/* Same as dealTwists: no repeats until the deck runs dry, then reshuffle. */
-export function dealHorrors(count, rng = Math.random) {
+/* ---------- tiers and tips ----------
+   Tier 1 (the default) is a rule that is easy to obey and a secret effect that
+   is kind; tier 2 asks for a move or hits harder; tier 3 is the No Mercy end
+   of the deck — big point swings and the hardest skills. The same shape as
+   engine/twists.js, and the same rules: a key listed here that isn't in the
+   deck is a typo, and tests/horror.test.js says so. */
+export const TIER_3 = new Set(["wild-draw-six", "stacked-draw", "wild-draw-ten", "wipeout", "skip-everyone", "hand-swap", "pass-your-hand", "double-phantom", "spellbound-goal", "witchs-roulette", "tricksters-toll", "chain-of-curses", "no-mercy", "stack-attack", "draw-until-you-play"]);
+export const TIER_2 = new Set(["upside-down", "cursed-crown", "mirror-world", "poisoned-chalice", "backwards-clock", "monkeys-paw", "evil-twin", "trick-not-treat", "reverse-card", "vampire", "leech", "soul-stealer", "grim-tax", "ghost-pickpocket", "black-hole", "double-draw", "shrinking-curse", "puppet-strings", "the-traitor", "hot-potato", "possessed-ref", "stacking-curse", "draw-four", "skipped", "stacking-plus-two", "colour-roulette", "discard-all", "wild-card", "phantom-shot", "skeleton-stepover", "ghost-turn", "shapeshifter", "scissor-hands", "poltergeist-pass"]);
+export const tierOf = (key) => (TIER_3.has(key) ? 3 : TIER_2.has(key) ? 2 : 1);
+
+/* The skill rules are chaos moves in costume, so they borrow its how-to. */
+const TIP_SOURCE = {
+  "phantom-shot": "fake-shot", "double-phantom": "double-fake", "spellbound-goal": "skill-goal",
+  "skeleton-stepover": "stepover", "ghost-turn": "turn-to-score", "shapeshifter": "body-feint",
+  "witchs-roulette": "roulette", "scissor-hands": "scissors", "poltergeist-pass": "fake-pass",
+  "tricksters-toll": "beat-player", "chain-of-curses": "skill-chain",
+};
+export const tipOf = (key) => (TIP_SOURCE[key] ? TWIST_TIPS[TIP_SOURCE[key]] : null);
+
+/* "climb": the first third of the matches draw from tier 1, the middle third
+   from tier 2, the last third from tier 3. Each tier's rules are shuffled and
+   used up before any comes round again, and within a tier no secret effect
+   repeats while a fresh one is left — the same rule as the random deal. */
+function dealClimbing(count, rng) {
+  const decks = { 1: [], 2: [], 3: [] };
+  const seen = { 1: new Set(), 2: new Set(), 3: new Set() };
+  const dealt = [];
+  for (let i = 0; i < count; i++) {
+    const tier = bandOf(i, count);
+    if (decks[tier].length === 0) decks[tier] = shuffle(HORROR_TWISTS.filter((t) => tierOf(t.key) === tier), rng);
+    const fresh = (t) => !isSecret(t) || !seen[tier].has(t.fate);
+    if (!decks[tier].some((t) => isSecret(t) && fresh(t))) seen[tier] = new Set();
+    const [rule] = decks[tier].splice(decks[tier].findIndex(fresh), 1);
+    if (isSecret(rule)) seen[tier].add(rule.fate);
+    dealt.push(rule.key);
+  }
+  return dealt;
+}
+
+/* No rule repeats until the deck runs dry, then it reshuffles — and no
+   secret *effect* repeats either while a fresh one is still in the deck.
+   Nine different rules reverse the result; dealt blind, a short tournament
+   could meet three of them and feel like the same trick three times. So a
+   secret rule whose fate has already come up is passed over until every
+   fate left in the deck has had its turn. Open rules are all different to
+   play, so they are never held back. */
+export function dealHorrors(count, rng = Math.random, order = "random") {
+  if (order === "climb") return dealClimbing(count, rng);
   const dealt = [];
   let deck = [];
+  let seenFates = new Set();
+  const fresh = (t) => !isSecret(t) || !seenFates.has(t.fate);
   for (let i = 0; i < count; i++) {
     if (deck.length === 0) deck = shuffle(HORROR_TWISTS, rng);
-    dealt.push(deck.shift().key);
+    if (!deck.some((t) => isSecret(t) && fresh(t))) seenFates = new Set();
+    const [rule] = deck.splice(deck.findIndex(fresh), 1);
+    if (isSecret(rule)) seenFates.add(rule.fate);
+    dealt.push(rule.key);
   }
   return dealt;
 }
@@ -300,6 +354,9 @@ export function computeHorrorStandings(players, matches) {
     if (ob.r) b[ob.r]++;
     a.pts += oa.pts;
     b.pts += ob.pts;
+    // red cards (engine/cards.js), docked before any swap or rotate moves totals
+    a.pts -= Number(m.d1 || 0);
+    b.pts -= Number(m.d2 || 0);
     if (fate === "skip-all" && s1 !== s2) {
       players.forEach((p) => { if (p.id !== m.p1 && p.id !== m.p2) table[p.id].pts -= 1; });
     }

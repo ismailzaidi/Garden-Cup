@@ -1,7 +1,8 @@
 import { Dices } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { generateGroupMatches } from "../engine/match.js";
-import { dealTwists, twistOf } from "../engine/twists.js";
+import { dealTwists, twistOf, tipOf } from "../engine/twists.js";
+import { DEFAULT_ORDER, ORDERS, formatOrder, bandOf } from "../engine/tiers.js";
 import { computeStandings } from "../engine/standings.js";
 import ChampionBanner from "../components/ChampionBanner.jsx";
 import StandingsTable from "../components/StandingsTable.jsx";
@@ -43,8 +44,8 @@ function FixturesView({ matches, config, nameOf, champion, standings, timerContr
           <div className="space-y-3">
             {cm.filter((m) => m.leg === leg).map((m) => (
               <div key={m.id}>
-                <TwistBanner twist={twistOf(m.twist)} />
-                <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
+                <TwistBanner twist={twistOf(m.twist)} tier={m.tier} tip={tipOf(m.twist)} />
+                <MatchCard match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard}
                   onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
               </div>
             ))}
@@ -69,13 +70,15 @@ export default {
   stages: ["chaos"],
   config: {
     chaosLegs: { type: "choice", label: "Times each pair plays", options: [1, 2, 3 , 4], default: DEFAULT_LEGS },
+    chaosOrder: { type: "choice", label: "Rule order", options: ORDERS, default: DEFAULT_ORDER, format: formatOrder },
   },
   summary: ({ players, config }) => {
     const legCount = config.chaosLegs ?? DEFAULT_LEGS;
     const matchCount = (players.length * (players.length - 1) * legCount) / 2;
     return (
       <>
-        <b style={{ color: C.ink }}>{matchCount} matches</b>, each one dealt a random silly rule the players have to obey.
+        <b style={{ color: C.ink }}>{matchCount} matches</b>, each one dealt a silly rule the players have to obey
+        {(config.chaosOrder ?? DEFAULT_ORDER) === "climb" ? " — easy ones first, getting harder as you go" : ""}.
         Normal scoring — top of the table wins.
       </>
     );
@@ -87,9 +90,12 @@ export default {
   },
   createFixtures: ({ players, config, rng = Math.random }) => {
     const base = generateGroupMatches(players, config.chaosLegs ?? DEFAULT_LEGS, rng);
-    const twists = dealTwists(base.length, rng);
+    const order = config.chaosOrder ?? DEFAULT_ORDER;
+    const twists = dealTwists(base.length, rng, order);
     return {
-      matches: base.map((m, i) => ({ ...m, stage: "chaos", twist: twists[i] })),
+      // the level is stamped on the match so a later change to the tier lists
+      // can't quietly re-label a tournament already dealt
+      matches: base.map((m, i) => ({ ...m, stage: "chaos", twist: twists[i], ...(order === "climb" ? { tier: bandOf(i, base.length) } : {}) })),
       modeState: {},
       initialTab: "fixtures",
     };

@@ -11,17 +11,20 @@ weak signal.
 
 ## Modes
 
-- **League + Final** — round robin (1–4 legs), top 2 play a best-of-1 or best-of-3 final
-- **Pure League** — round robin, top of the table wins
+- **League + Final** — round robin (1–4 legs), then the top 2 play a best-of-1 or best-of-3 final — or pick **No final** and top of the table wins
 - **Knockout** — randomised single-elimination bracket with automatic byes
 - **Winner Stays On** — king defends the pitch, challengers queue up
-- **Best of N** — two players, a fixed number of legs (3, 5, or 7), most points wins
 - **Garden World Cup** — two groups, then semi-finals, a third-place playoff, and a best-of-1 or best-of-3 final
 - **Golden Boot Race** — first player to score N goals in total takes the boot
 - **Last One Standing** — everyone plays everyone, bottom of the table goes out each round
 - **Penalty Shootout Cup** — a knockout bracket decided entirely on penalties
 - **Chaos Cup** — round robin where every match is dealt a random silly rule
-- **League + Chaos** — round robin played straight, then a best-of-1 or best-of-3 final where every leg has a random silly rule
+- **Horror** — round robin where every match is dealt a spooky rule; the secret ones rewrite the result at full time
+
+Three earlier modes are retired: **Pure League** (now the "No final" option on
+League + Final), **Best of N** and **League + Chaos**. Tournaments played in
+them still show in History under their old names, and a Pure League that was
+half-played carries on as a League with no final.
 
 Fixtures give every player a fair share of home starts: nobody sits through a
 whole tournament kicking off away from home (see `generateGroupMatches` in
@@ -152,9 +155,27 @@ locked once the fixtures exist, shown above the matches while the tournament
 is played, and awarded by name when there's a champion. Players level at the
 bottom share the forfeit. Both are written on the History record.
 
+## Rule order: easy to hard
+
+Chaos Cup and Horror both have a **Rule order** choice at setup. The default,
+**Easy to hard**, is a learning curve: the first third of the matches are
+dealt tier 1 rules (one simple thing to remember), the middle third tier 2
+(a move, or something extra to keep track of), and the last third tier 3 (hard
+skills, combinations and big stakes). Each match card shows its level, and
+the skill rules carry a one-line "How:" so a child can learn a stepover or a
+fake shot as well as being told to do one. In Horror the secret effects climb
+too: kind ones first, the No Mercy set (minus 6, minus 10, hand swap, skip
+everyone) in the last third. **Mixed up** is the old behaviour, the whole
+deck shuffled together. Which rules sit in which tier is `TIER_2` and
+`TIER_3` in `src/engine/twists.js` and `src/engine/horror.js`.
+
 ## Horror mode has no mercy
 
-The Horror deck deals 102 rules. Eleven are skill rules (a fake shot before
+The Horror deck deals 92 rules. Every one leaves a decided match with a
+winning side: the rules that voided a match or made both players lose are
+retired. No rule is dealt twice until all 92 have been used, and no secret
+effect (the winner loses, minus 6, hand swap…) comes round again until every
+other one has had its turn. Eleven are skill rules (a fake shot before
 every real one, two fakes in a row, skill finishes only). Fifteen are a No
 Mercy deck borrowed from the card game: sealed rules that hit the loser for
 minus 6 or minus 10, swap two players' whole points totals, pass everyone's
@@ -174,6 +195,24 @@ always a one-goal swing. The announcer calls it — "Referee's whistle! Slow
 play card for …" — or a whistle sounds when there's no voice to speak with.
 The little `×2` on the button counts the cards shown in that match. Shown one
 by mistake? Put the score right with the goal buttons.
+
+## Cards on the Stats tab
+
+The Stats tab has a **Cards** section: every player who has been shown a
+card, with their yellow and red counts, and who has the most of each. It
+counts the current tournament only, like the rest of that tab.
+
+## The red card
+
+Beside the yellow on every match card is a **red card**, for a real offence.
+Same two taps. It docks **3 points** from that player in the table, once the
+match is marked played; the score isn't touched. Modes and stages with no
+points table to dock — Knockout, Penalty Shootout Cup, Winner Stays On,
+Golden Boot Race, and the World Cup's semi-finals and final — take **2 goals**
+off instead, so a red always costs something. **Undo red** under the buttons
+takes the card and its points back (a red that cost goals is put right with
+the goal buttons). Both numbers are `RED_CARD_POINTS` and `RED_CARD_GOALS` in
+`src/engine/cards.js`.
 
 ## Audio note
 

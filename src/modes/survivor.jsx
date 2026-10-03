@@ -100,7 +100,7 @@ function ArenaView({ players, matches, modeState, nameOf, champion, timerControl
           </SectionLabel>
           <div className="space-y-2.5">
             {roundMatches.map((m) => (
-              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard}
+              <MatchCard key={m.id} match={m} nameOf={nameOf} onAddGoal={actions.addGoal} onUndoGoal={actions.undoGoal} onCard={actions.giveCard} onRedCard={actions.giveRedCard} onUndoRedCard={actions.undoRedCard}
                 onTogglePlayed={actions.togglePlayed} {...timerControls(m.id)} />
             ))}
           </div>

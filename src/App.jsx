@@ -54,7 +54,7 @@ function TournamentShell() {
   const { mode, user, logout } = useAuth();
   const {
     players, nameInput, mode: tourneyMode, config, matches, goals, modeState, stakes, tab, history,
-    activeMode, standings, champion, lastPlace, nameOf, topScorers, minuteData, quickestGoal, lastGasp, winsTable,
+    activeMode, standings, champion, lastPlace, nameOf, topScorers, minuteData, cardCounts, quickestGoal, lastGasp, winsTable,
     timerControls, actions,
   } = useTournament();
 
@@ -185,7 +185,7 @@ function TournamentShell() {
         )}
 
         {tab === "stats" && (
-          <StatsView topScorers={topScorers} minuteData={minuteData} quickestGoal={quickestGoal} lastGasp={lastGasp} nameOf={nameOf} />
+          <StatsView topScorers={topScorers} minuteData={minuteData} cardCounts={cardCounts} quickestGoal={quickestGoal} lastGasp={lastGasp} nameOf={nameOf} />
         )}
 
         {tab === "wins" && <WinsView winsTable={winsTable} />}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import chaos from "../src/modes/chaos.jsx";
-import { TWISTS, RETIRED_TWISTS, dealTwists, twistOf } from "../src/engine/twists.js";
+import { TWISTS, RETIRED_TWISTS, TIER_2, TIER_3, TWIST_TIPS, dealTwists, twistOf, tierOf, tipOf } from "../src/engine/twists.js";
 
 function seededRng(seed) {
   let s = seed;
@@ -117,5 +117,55 @@ describe("chaos.champion", () => {
     const ps = [{ id: "a", name: "A" }, { id: "b", name: "B" }];
     const champ = chaos.champion({ players: ps, matches: [m("a", "b", 2, 0)], config: {}, modeState: {} });
     expect(champ.id).toBe("a");
+  });
+});
+
+describe("chaos tiers and the climbing deal", () => {
+  const liveKeys = new Set(TWISTS.map((t) => t.key));
+
+  it("only lists live twists in the tier sets, so a typo can't hide", () => {
+    for (const key of [...TIER_2, ...TIER_3]) expect(liveKeys.has(key), key).toBe(true);
+    expect([...TIER_2].filter((k) => TIER_3.has(k))).toEqual([]);
+  });
+
+  it("gives every tier plenty of twists to draw from", () => {
+    for (const tier of [1, 2, 3]) expect(TWISTS.filter((t) => tierOf(t.key) === tier).length).toBeGreaterThanOrEqual(15);
+  });
+
+  it("has a short how-to for skill moves, and only for live twists", () => {
+    for (const key of ["fake-shot", "double-fake", "skill-goal", "stepover"]) expect(tipOf(key)).toBeTruthy();
+    expect(Object.keys(TWIST_TIPS).filter((k) => !liveKeys.has(k))).toEqual([]);
+    expect(Object.values(TWIST_TIPS).filter((t) => t.length > 90)).toEqual([]);
+    expect(tipOf("weak-foot")).toBeNull();
+  });
+
+  it("deals tier 1 first, tier 2 in the middle and tier 3 last", () => {
+    for (const seed of [1, 2, 3]) {
+      const tiers = dealTwists(30, seededRng(seed), "climb").map(tierOf);
+      expect(tiers.slice(0, 10).every((t) => t === 1)).toBe(true);
+      expect(tiers.slice(10, 20).every((t) => t === 2)).toBe(true);
+      expect(tiers.slice(20).every((t) => t === 3)).toBe(true);
+    }
+  });
+
+  it("never repeats a twist while a tier still has an unused one", () => {
+    const dealt = dealTwists(45, seededRng(5), "climb");
+    expect(new Set(dealt).size).toBe(45);
+  });
+
+  it("is deterministic under a seeded rng, and leaves the random deal alone", () => {
+    expect(dealTwists(12, seededRng(9), "climb")).toEqual(dealTwists(12, seededRng(9), "climb"));
+    expect(dealTwists(12, seededRng(9))).toEqual(dealTwists(12, seededRng(9), "random"));
+  });
+
+  it("chaos.createFixtures climbs by default and stamps each match's level", () => {
+    const { matches } = chaos.createFixtures({ players: players(4), config: { chaosLegs: 1 }, rng: seededRng(3) });
+    expect(matches.map((m) => m.tier)).toEqual([1, 1, 2, 2, 3, 3]);
+    expect(matches.every((m) => tierOf(m.twist) === m.tier)).toBe(true);
+  });
+
+  it("chaos.createFixtures stamps no level when the order is mixed up", () => {
+    const { matches } = chaos.createFixtures({ players: players(4), config: { chaosLegs: 1, chaosOrder: "random" }, rng: seededRng(3) });
+    expect(matches.every((m) => m.tier === undefined)).toBe(true);
   });
 });

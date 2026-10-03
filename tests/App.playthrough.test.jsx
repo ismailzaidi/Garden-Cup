@@ -2,7 +2,6 @@ import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, render, screen, fireEvent, within } from "@testing-library/react";
 import App from "../src/App.jsx";
-import { TWISTS } from "../src/engine/twists.js";
 
 // No real browser is available in this environment, so these drive the app
 // the same way a manual click-through would: through rendered text and
@@ -221,12 +220,12 @@ describe("Winner Stays On — full playthrough", () => {
   });
 });
 
-describe("Pure League — full playthrough", () => {
+describe("League with no final — full playthrough", () => {
   it("crowns the table leader with no final phase", async () => {
     render(<App />);
     addPlayer("Alice");
     addPlayer("Bob");
-    clickText("Pure League");
+    clickText("No final");
     clickText("1");
     clickText("GENERATE FIXTURES");
 
@@ -239,42 +238,9 @@ describe("Pure League — full playthrough", () => {
     expect(await screen.findByText("Champion")).toBeInTheDocument();
 
     clickText(/History/);
-    expect(await screen.findAllByText("Pure League")).toHaveLength(2);
-  });
-});
-
-describe("Best of N — full playthrough (the phase-8 proof mode)", () => {
-  it("caps the roster at maxPlayers and crowns a champion once every leg is played", async () => {
-    render(<App />);
-    clickText("Best of N");
-    addPlayer("Alice");
-    addPlayer("Bob");
-    addPlayer("Cara"); // should be silently rejected — mode caps at 2
-
-    expect(screen.getByText("Alice")).toBeInTheDocument();
-    expect(screen.getByText("Bob")).toBeInTheDocument();
-    expect(screen.queryByText("Cara")).not.toBeInTheDocument();
-    expect(screen.getByText("This mode needs exactly 2 players.")).toBeInTheDocument();
-
-    clickText("3"); // number of legs
-    clickText("GENERATE LEGS");
-
-    await screen.findByText(/Legs/);
-    let addGoalButtons = screen.getAllByLabelText("Add goal");
-    expect(addGoalButtons).toHaveLength(6); // 3 legs x 2 sides
-    // make the home side win all three legs it appears in isn't guaranteed
-    // (randomOrder can flip sides per leg) — instead score every match's
-    // p1 twice, which strictly must beat an unscored p2 regardless of who's home.
-    [0, 2, 4].forEach((i) => {
-      fireEvent.click(addGoalButtons[i]);
-      fireEvent.click(addGoalButtons[i]);
-    });
-    screen.getAllByText("Mark played").forEach((btn) => fireEvent.click(btn));
-
-    expect(await screen.findByText("Champion")).toBeInTheDocument();
-
-    clickText(/History/);
-    expect(await screen.findAllByText("Best of N")).toHaveLength(2);
+    // there is no Final tab to visit
+    expect(screen.queryByText("Final")).not.toBeInTheDocument();
+    expect(await screen.findAllByText("League + Final")).toHaveLength(2);
   });
 });
 
@@ -439,46 +405,6 @@ describe("Garden World Cup — full playthrough", () => {
   });
 });
 
-describe("League + Chaos — full playthrough", () => {
-  it("plays the group stage straight, then deals twists to the final", async () => {
-    render(<App />);
-    addPlayer("Alice");
-    addPlayer("Bob");
-    clickText("League + Chaos");
-    clickText("1"); // legs per pairing
-    clickText("Best of 1"); // the final
-    clickText("GENERATE FIXTURES");
-
-    // the group stage is played straight — no twist banner anywhere yet
-    await screen.findByText(/Fixtures/);
-    expect(TWISTS.some((t) => screen.queryByText(t.label))).toBe(false);
-    const addGoalButtons = screen.getAllByLabelText("Add goal");
-    expect(addGoalButtons).toHaveLength(2);
-    fireEvent.click(addGoalButtons[0]);
-    fireEvent.click(addGoalButtons[0]);
-    clickText("Mark played");
-
-    clickText("Table");
-    clickText("SET UP CHAOS FINAL (TOP 2)");
-
-    // the final is the only place chaos happens, so its one leg must be
-    // wearing a twist from the deck
-    const finalGoalButtons = await screen.findAllByLabelText("Add goal");
-    expect(finalGoalButtons).toHaveLength(2);
-    expect(TWISTS.some((t) => screen.queryByText(t.label))).toBe(true);
-
-    fireEvent.click(finalGoalButtons[0]);
-    fireEvent.click(finalGoalButtons[0]);
-    clickText("Mark played");
-
-    expect(await screen.findByText("Champion")).toBeInTheDocument();
-    expect(screen.getByText(/Won the chaos final 3–0 on points/)).toBeInTheDocument();
-
-    clickText(/History/);
-    expect(await screen.findAllByText("League + Chaos")).toHaveLength(2);
-  });
-});
-
 // Fakes just enough of the Web Speech API for speakResult (src/engine/
 // announce.js) to take its speech path rather than falling back to the
 // motif — jsdom implements neither SpeechSynthesis nor
@@ -620,7 +546,7 @@ describe("Slow-play card", () => {
     render(<App />);
     addPlayer("Alice");
     addPlayer("Bob");
-    clickText("Pure League");
+    clickText("No final");
     clickText("1");
     clickText("GENERATE FIXTURES");
 
@@ -648,7 +574,7 @@ describe("Slow-play card", () => {
 
     // the goal that was taken off is gone from the stats too
     clickText("Stats");
-    expect(screen.queryByText(home)).not.toBeInTheDocument();
+    expect(screen.getByText(/No goals logged yet/)).toBeInTheDocument();
   });
 });
 
@@ -666,7 +592,7 @@ describe("Teams, a prize and a last place forfeit", () => {
 
     clickText("No homework tonight");
     clickText("Set the table");
-    clickText("Pure League");
+    clickText("No final");
     clickText("1");
     clickText("GENERATE FIXTURES");
     await screen.findByText(/Fixtures/);
@@ -720,5 +646,127 @@ describe("Prize and forfeit ideas", () => {
     // a second tap always changes it
     fireEvent.click(screen.getByLabelText("Random champion's prize"));
     expect(screen.getByLabelText("Champion's prize").value).not.toBe(prize);
+  });
+});
+
+describe("Red card", () => {
+  it("docks 3 points in a league table, and can be taken back", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("No final");
+    clickText("1");
+    clickText("GENERATE FIXTURES");
+    await screen.findByText(/Fixtures/);
+
+    const home = homeNameOfFirstCard();
+    fireEvent.click(screen.getAllByLabelText("Add goal")[0]);
+    fireEvent.click(screen.getByLabelText(`Red card for ${home}`));
+    fireEvent.click(screen.getByLabelText(`Confirm red card for ${home}`));
+    // the score is untouched — a red costs points here, not goals
+    expect(screen.getAllByLabelText("Add goal")[0]).toHaveTextContent("1");
+    clickText("Mark played");
+
+    clickText("Table");
+    // won 1-0 for 3 points, docked 3: both players on 0, so the home side leads on goal difference only
+    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent(home);
+    expect(within(rows[0]).getAllByRole("cell").at(-1)).toHaveTextContent("0");
+
+    clickText(/Fixtures/);
+    fireEvent.click(screen.getByLabelText(`Undo red card for ${home}`));
+    clickText("Table");
+    const after = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+    expect(within(after[0]).getAllByRole("cell").at(-1)).toHaveTextContent("3");
+  });
+
+  it("costs 2 goals in a knockout, where there is no table to dock", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("Knockout");
+    clickText("GENERATE BRACKET");
+    await screen.findByText(/Bracket/);
+
+    const home = homeNameOfFirstCard();
+    const [homeScore, awayScore] = screen.getAllByLabelText("Add goal");
+    fireEvent.click(homeScore);
+    fireEvent.click(screen.getByLabelText(`Red card for ${home}`));
+    fireEvent.click(screen.getByLabelText(`Confirm red card for ${home}`));
+    // one goal to lose, so the second goes to the opponent
+    expect(homeScore).toHaveTextContent("0");
+    expect(awayScore).toHaveTextContent("1");
+  });
+});
+
+describe("Stats — cards", () => {
+  it("lists who has been shown yellow and red cards, and who has the most", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("No final");
+    clickText("1");
+    clickText("GENERATE FIXTURES");
+    await screen.findByText(/Fixtures/);
+
+    clickText("Stats");
+    expect(screen.getByText(/No cards shown yet/)).toBeInTheDocument();
+
+    clickText(/Fixtures/);
+    const card = (kind, name) => {
+      fireEvent.click(screen.getByLabelText(`${kind} for ${name}`));
+      fireEvent.click(screen.getByLabelText(`Confirm ${kind.toLowerCase()} for ${name}`));
+    };
+    card("Slow play card", "Alice");
+    card("Slow play card", "Alice");
+    card("Slow play card", "Bob");
+    card("Red card", "Bob");
+
+    clickText("Stats");
+    expect(screen.getByText("Alice (2)")).toBeInTheDocument(); // most yellows
+    expect(screen.getByText("Bob (1)")).toBeInTheDocument();   // most reds
+    expect(screen.getAllByLabelText("2 yellow")).toHaveLength(1);
+    expect(screen.getAllByLabelText("1 red")).toHaveLength(1);
+  });
+});
+
+describe("Rule order — easy to hard", () => {
+  it("defaults Chaos to easy to hard, shows each match's level, and can be switched to mixed up", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    addPlayer("Cara");
+    clickText("Chaos Cup");
+    expect(screen.getByRole("button", { name: "Easy to hard" })).toHaveStyle({ backgroundColor: "#1E5631" });
+    clickText("DEAL THE CHAOS");
+    await screen.findByText(/Chaos ·/);
+
+    // three matches: one from each third of the climb
+    expect(screen.getByText("Level 1 · Easy")).toBeInTheDocument();
+    expect(screen.getByText("Level 2 · Medium")).toBeInTheDocument();
+    expect(screen.getByText("Level 3 · Hard")).toBeInTheDocument();
+  });
+
+  it("shows no levels when the order is mixed up", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    clickText("Chaos Cup");
+    clickText("Mixed up");
+    clickText("DEAL THE CHAOS");
+    await screen.findByText(/Chaos ·/);
+    expect(screen.queryByText(/Level \d/)).not.toBeInTheDocument();
+  });
+
+  it("climbs Horror too, and shows a level on the sealed rules without giving them away", async () => {
+    render(<App />);
+    addPlayer("Alice");
+    addPlayer("Bob");
+    addPlayer("Cara");
+    clickText("Horror");
+    clickText("SUMMON THE HORROR");
+    await screen.findByText(/Horror ·/);
+    expect(screen.getByText(/Level 1 · Easy/)).toBeInTheDocument();
+    expect(screen.getByText(/Level 3 · Hard/)).toBeInTheDocument();
   });
 });

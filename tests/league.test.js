@@ -102,3 +102,26 @@ describe("league.champion", () => {
     expect(league.champion({ players: ps, matches, config: {}, modeState: {} })).toBeNull();
   });
 });
+
+describe("league with no final", () => {
+  const ps = players(3);
+  const config = { legCount: 1, finalLegs: 0 };
+  const group = (p1, p2, s1, s2, played = true) => ({ id: `${p1}${p2}`, stage: "group", leg: 1, p1, p2, s1: String(s1), s2: String(s2), played });
+
+  it("crowns the table leader once every match is played", () => {
+    const matches = [group("p0", "p1", 2, 0), group("p0", "p2", 1, 0), group("p1", "p2", 1, 0)];
+    expect(league.champion({ players: ps, matches, config }).id).toBe("p0");
+    expect(league.champion({ players: ps, matches: [...matches.slice(0, 2), group("p1", "p2", 0, 0, false)], config })).toBeNull();
+  });
+
+  it("is null when the top two are level on points", () => {
+    const matches = [group("p0", "p1", 1, 1), group("p0", "p2", 1, 0), group("p1", "p2", 1, 0)];
+    expect(league.champion({ players: ps, matches, config })).toBeNull();
+  });
+
+  it("has no Final tab and never builds a final", () => {
+    const matches = [group("p0", "p1", 2, 0)];
+    expect(league.tabs({ matches, config }).map((t) => t.key)).toEqual(["fixtures", "standings"]);
+    expect(advance({ players: ps, matches, config }).matches).toBe(matches);
+  });
+});
