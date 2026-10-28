@@ -7,6 +7,13 @@
  *   2. Array order is data — goals[] drives undo, matches[] drives fixture
  *      display, modeState.queue[] decides who plays next. Always write and
  *      read sort_order (position for mode_queue) from the array index.
+ *
+ * Nothing the client keeps may be silently dropped: a field either has a
+ * column, lives in one of the validated JSON columns added by
+ * migrations/003_lossless_state.sql (team members, stakes, per-match extras,
+ * the non-queue part of modeState), or is rejected. tests/serializer.test.js
+ * plays every mode through and checks the round trip is lossless, so a new
+ * mode that invents a field fails there instead of losing data in production.
  */
 import { ulid } from "./id.js";
 import { MODE_STAGES, isValidStage } from "./modes.js";
@@ -40,6 +47,107 @@ function assertNoDuplicates(ids, label) {
   if (new Set(ids).size !== ids.length) throw new ValidationError(`duplicate ${label} id`);
 }
 
+/* ---------- the JSON-column fields ---------- */
+const MAX_MEMBERS = 8; // engine/teams.js
+
+// mariadb returns a JSON column as text, MySQL as an already-parsed value
+const parseJson = (v) => (typeof v === "string" ? JSON.parse(v) : v);
+
+function validateMembers(v) {
+  if (v === undefined || v === null) return null;
+  if (!Array.isArray(v) || v.length === 0 || v.length > MAX_MEMBERS) throw new ValidationError("invalid player.members");
+  return v.map((m) => str(m, 24, "player.members[]"));
+}
+
+// The per-match fields beyond the columns: the red/yellow card badges and
+// docked points (engine/cards.js), the dealt rule and its tier (chaos and
+// horror; engine/twists.js, engine/tiers.js) and the World Cup's group and
+// third-place flag. Whitelisted by name — anything else on a match is not
+// stored — and every value is type- and range-checked.
+const MATCH_EXTRA_FIELDS = {
+  c1: (v) => nonNegInt(v, "match.c1"),
+  c2: (v) => nonNegInt(v, "match.c2"),
+  r1: (v) => nonNegInt(v, "match.r1"),
+  r2: (v) => nonNegInt(v, "match.r2"),
+  d1: (v) => nonNegInt(v, "match.d1"),
+  d2: (v) => nonNegInt(v, "match.d2"),
+  twist: (v) => {
+    if (typeof v !== "string" || !/^[a-z0-9-]{1,32}$/.test(v)) throw new ValidationError("invalid match.twist");
+    return v;
+  },
+  tier: (v) => {
+    const n = nonNegInt(v, "match.tier", 3);
+    if (n < 1) throw new ValidationError("invalid match.tier");
+    return n;
+  },
+  group: (v) => str(v, 8, "match.group"),
+  thirdPlace: (v) => {
+    if (typeof v !== "boolean") throw new ValidationError("invalid match.thirdPlace");
+    return v;
+  },
+};
+
+function validateMatchExtra(m) {
+  const extra = {};
+  for (const [key, check] of Object.entries(MATCH_EXTRA_FIELDS)) {
+    if (m[key] !== undefined && m[key] !== null) extra[key] = check(m[key]);
+  }
+  return Object.keys(extra).length ? extra : null;
+}
+
+// What the tournament is played for (engine/stakes.js): both text boxes are
+// capped at 40 characters client-side.
+function validateStakes(v) {
+  const stakes = { prize: "", chore: "" };
+  if (v === undefined || v === null) return stakes;
+  if (typeof v !== "object" || Array.isArray(v)) throw new ValidationError("invalid stakes");
+  for (const key of ["prize", "chore"]) {
+    if (v[key] === undefined || v[key] === null) continue;
+    if (typeof v[key] !== "string" || v[key].length > 40) throw new ValidationError(`invalid stakes.${key}`);
+    stakes[key] = v[key];
+  }
+  return stakes;
+}
+
+// modeState is open-ended per mode (src/modes/contract.md). `queue` has its
+// own table; these are the other keys the built-in modes keep: survivor's
+// alive/eliminated and the World Cup's group draw. A key not listed here is
+// not stored — add it here (and to tests/serializer.test.js) with the mode.
+function validateModeStateExtra(modeState, playerIds) {
+  const out = {};
+  const ids = (list, label) => {
+    if (!Array.isArray(list) || list.length > 64) throw new ValidationError(`invalid modeState.${label}`);
+    return list.map((pid) => {
+      str(pid, 24, `modeState.${label}[]`);
+      if (!playerIds.has(pid)) throw new ValidationError(`modeState.${label} references an unknown player`);
+      return pid;
+    });
+  };
+  if (modeState.alive !== undefined) out.alive = ids(modeState.alive, "alive");
+  if (modeState.eliminated !== undefined) {
+    if (!Array.isArray(modeState.eliminated) || modeState.eliminated.length > 64) throw new ValidationError("invalid modeState.eliminated");
+    out.eliminated = modeState.eliminated.map((e) => {
+      if (!e || typeof e !== "object") throw new ValidationError("invalid modeState.eliminated[]");
+      const id = str(e.id, 24, "modeState.eliminated[].id");
+      if (!playerIds.has(id)) throw new ValidationError("modeState.eliminated references an unknown player");
+      return { id, round: nonNegInt(e.round, "modeState.eliminated[].round", 255) };
+    });
+  }
+  if (modeState.groups !== undefined) {
+    const g = modeState.groups;
+    if (!g || typeof g !== "object" || Array.isArray(g) || Object.keys(g).length > 4) throw new ValidationError("invalid modeState.groups");
+    out.groups = {};
+    for (const key of Object.keys(g)) out.groups[str(key, 8, "modeState.groups key")] = ids(g[key], "groups[]");
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+const stringifyChecked = (value, max, field) => {
+  const json = JSON.stringify(value);
+  if (json.length > max) throw new ValidationError(`${field} is larger than expected`);
+  return json;
+};
+
 export function validateState(state) {
   if (!state || typeof state !== "object") throw new ValidationError("state must be an object");
 
@@ -54,7 +162,10 @@ export function validateState(state) {
     throw new ValidationError("state is larger than a real tournament should be");
   }
 
-  const players = state.players.map((p) => ({ id: str(p.id, 24, "player.id"), name: str(p.name, 24, "player.name") }));
+  const players = state.players.map((p) => {
+    const members = validateMembers(p.members);
+    return { id: str(p.id, 24, "player.id"), name: str(p.name, 24, "player.name"), ...(members ? { members } : {}) };
+  });
   assertNoDuplicates(players.map((p) => p.id), "player");
   const playerIds = new Set(players.map((p) => p.id));
 
@@ -76,6 +187,7 @@ export function validateState(state) {
       s2: nonNegInt(m.s2, "match.s2"),
       played: Boolean(m.played),
       bye: Boolean(m.bye),
+      extra: validateMatchExtra(m),
     };
   });
   assertNoDuplicates(matches.map((m) => m.id), "match");
@@ -106,17 +218,41 @@ export function validateState(state) {
   }
   if (configJson.length > 8192) throw new ValidationError("config is larger than expected");
 
-  // modeState is declared open-ended per mode (src/modes/contract.md), but
-  // only `queue` round-trips today — anything else a future mode stores
-  // there is silently dropped on save. Only `king` uses modeState at all
-  // right now, so nothing is broken by this yet, but a new mode that adds a
-  // second modeState key needs a matching column/table here first.
-  const queueRaw = state.modeState && Array.isArray(state.modeState.queue) ? state.modeState.queue : [];
+  const modeState = state.modeState && typeof state.modeState === "object" ? state.modeState : {};
+  const queueRaw = Array.isArray(modeState.queue) ? modeState.queue : [];
   const queue = queueRaw.map((pid) => str(pid, 24, "modeState.queue[]"));
   for (const pid of queue) if (!playerIds.has(pid)) throw new ValidationError("modeState.queue references an unknown player");
+  const modeStateExtra = validateModeStateExtra(modeState, playerIds);
+  const modeStateJson = modeStateExtra ? stringifyChecked(modeStateExtra, 4096, "modeState") : null;
 
-  return { mode, tournamentId, players, matches, goals, configJson, queue, historySaved: Boolean(state.historySaved) };
+  const stakesJson = JSON.stringify(validateStakes(state.stakes));
+
+  return { mode, tournamentId, players, matches, goals, configJson, queue, stakesJson, modeStateJson, historySaved: Boolean(state.historySaved) };
 }
+
+/* ---------- row <-> object (pure; the SQL below only moves these around) ---------- */
+export const matchExtraJson = (m) => (m.extra ? stringifyChecked(m.extra, 512, "match extras") : null);
+export const membersJson = (p) => (p.members ? JSON.stringify(p.members) : null);
+
+export const playerFromRow = (p) => {
+  const members = p.members_json ? parseJson(p.members_json) : null;
+  return { id: p.client_id, name: p.name, ...(members ? { members } : {}) };
+};
+
+export const matchFromRow = (m) => ({
+  id: m.client_id,
+  stage: m.stage,
+  leg: m.leg,
+  round: m.round,
+  seq: m.seq,
+  p1: m.p1_client_id,
+  p2: m.p2_client_id,
+  s1: String(m.s1),
+  s2: String(m.s2),
+  played: Boolean(m.played),
+  bye: Boolean(m.bye),
+  ...(m.extra_json ? parseJson(m.extra_json) : {}),
+});
 
 /** Runs inside a transaction. Throws {conflict:true, version, state} on a version mismatch. */
 export async function saveCurrentTournament(conn, userId, expectedVersion, rawState) {
@@ -151,16 +287,17 @@ export async function saveCurrentTournament(conn, userId, expectedVersion, rawSt
     tournamentRowId = row.id;
     newVersion = Number(row.version) + 1;
     await conn.query(
-      "UPDATE tournaments SET mode=?, config_json=?, history_saved=?, status='active', version=? WHERE id=?",
-      [v.mode, v.configJson, v.historySaved ? 1 : 0, newVersion, tournamentRowId]
+      `UPDATE tournaments SET mode=?, config_json=?, stakes_json=?, mode_state_json=?, history_saved=?, status='active', version=?
+       WHERE id=?`,
+      [v.mode, v.configJson, v.stakesJson, v.modeStateJson, v.historySaved ? 1 : 0, newVersion, tournamentRowId]
     );
   } else {
     tournamentRowId = ulid();
     newVersion = 1;
     await conn.query(
-      `INSERT INTO tournaments (id, user_id, client_id, mode, config_json, history_saved, status, version)
-       VALUES (?, ?, ?, ?, ?, ?, 'active', ?)`,
-      [tournamentRowId, userId, v.tournamentId, v.mode, v.configJson, v.historySaved ? 1 : 0, newVersion]
+      `INSERT INTO tournaments (id, user_id, client_id, mode, config_json, stakes_json, mode_state_json, history_saved, status, version)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?)`,
+      [tournamentRowId, userId, v.tournamentId, v.mode, v.configJson, v.stakesJson, v.modeStateJson, v.historySaved ? 1 : 0, newVersion]
     );
   }
 
@@ -174,14 +311,17 @@ export async function saveCurrentTournament(conn, userId, expectedVersion, rawSt
 
   for (let i = 0; i < v.players.length; i++) {
     const p = v.players[i];
-    await conn.query("INSERT INTO players (tournament_id, client_id, name, sort_order) VALUES (?,?,?,?)", [tournamentRowId, p.id, p.name, i]);
+    await conn.query(
+      "INSERT INTO players (tournament_id, client_id, name, members_json, sort_order) VALUES (?,?,?,?,?)",
+      [tournamentRowId, p.id, p.name, membersJson(p), i]
+    );
   }
   for (let i = 0; i < v.matches.length; i++) {
     const m = v.matches[i];
     await conn.query(
-      `INSERT INTO matches (tournament_id, client_id, stage, leg, \`round\`, seq, p1_client_id, p2_client_id, s1, s2, played, bye, sort_order)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [tournamentRowId, m.id, m.stage, m.leg, m.round, m.seq, m.p1, m.p2, m.s1, m.s2, m.played ? 1 : 0, m.bye ? 1 : 0, i]
+      `INSERT INTO matches (tournament_id, client_id, stage, leg, \`round\`, seq, p1_client_id, p2_client_id, s1, s2, played, bye, extra_json, sort_order)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [tournamentRowId, m.id, m.stage, m.leg, m.round, m.seq, m.p1, m.p2, m.s1, m.s2, m.played ? 1 : 0, m.bye ? 1 : 0, matchExtraJson(m), i]
     );
   }
   for (let i = 0; i < v.goals.length; i++) {
@@ -205,15 +345,15 @@ export async function saveCurrentTournament(conn, userId, expectedVersion, rawSt
 // which is not always the same row.
 export async function composeTournamentRow(conn, tournamentRowId) {
   const trows = await conn.query(
-    "SELECT id, client_id, mode, config_json, history_saved FROM tournaments WHERE id=? LIMIT 1",
+    "SELECT id, client_id, mode, config_json, stakes_json, mode_state_json, history_saved FROM tournaments WHERE id=? LIMIT 1",
     [tournamentRowId]
   );
   if (!trows.length) return null;
   const t = trows[0];
 
-  const players = await conn.query("SELECT client_id, name FROM players WHERE tournament_id=? ORDER BY sort_order", [t.id]);
+  const players = await conn.query("SELECT client_id, name, members_json FROM players WHERE tournament_id=? ORDER BY sort_order", [t.id]);
   const matches = await conn.query(
-    `SELECT client_id, stage, leg, \`round\`, seq, p1_client_id, p2_client_id, s1, s2, played, bye
+    `SELECT client_id, stage, leg, \`round\`, seq, p1_client_id, p2_client_id, s1, s2, played, bye, extra_json
      FROM matches WHERE tournament_id=? ORDER BY sort_order`,
     [t.id]
   );
@@ -227,20 +367,8 @@ export async function composeTournamentRow(conn, tournamentRowId) {
   );
 
   return {
-    players: players.map((p) => ({ id: p.client_id, name: p.name })),
-    matches: matches.map((m) => ({
-      id: m.client_id,
-      stage: m.stage,
-      leg: m.leg,
-      round: m.round,
-      seq: m.seq,
-      p1: m.p1_client_id,
-      p2: m.p2_client_id,
-      s1: String(m.s1),
-      s2: String(m.s2),
-      played: Boolean(m.played),
-      bye: Boolean(m.bye),
-    })),
+    players: players.map(playerFromRow),
+    matches: matches.map(matchFromRow),
     goals: goals.map((g) => ({
       id: g.client_id,
       matchId: g.match_client_id,
@@ -251,7 +379,11 @@ export async function composeTournamentRow(conn, tournamentRowId) {
     })),
     mode: t.mode,
     config: JSON.parse(t.config_json || "{}"),
-    modeState: queue.length ? { queue: queue.map((q) => q.player_client_id) } : {},
+    modeState: {
+      ...(queue.length ? { queue: queue.map((q) => q.player_client_id) } : {}),
+      ...(t.mode_state_json ? parseJson(t.mode_state_json) : {}),
+    },
+    stakes: { prize: "", chore: "", ...(t.stakes_json ? parseJson(t.stakes_json) : {}) },
     tournamentId: t.client_id,
     historySaved: Boolean(t.history_saved),
     schemaVersion: 2,

@@ -10,7 +10,7 @@ import { lastPlaceOf } from "./stakes.js";
 import { resultSentence, speakResult } from "./announce.js";
 import { useTimers } from "./useTimers.js";
 import { storage } from "../lib/storage.js";
-import { addHistory, deleteHistory, clearHistory as syncClearHistory, REMOTE_UPDATE_EVENT } from "../lib/syncEngine.js";
+import { addHistory, deleteHistory, clearHistory as syncClearHistory, registerPreFlush, REMOTE_UPDATE_EVENT } from "../lib/syncEngine.js";
 import { MODES, getMode } from "../modes/index.js";
 
 const CURRENT_KEY = "gardenCup:current";
@@ -88,17 +88,35 @@ export function useTournament() {
     return () => window.removeEventListener(REMOTE_UPDATE_EVENT, onRemoteUpdate);
   }, []);
 
-  /* persist */
-  useEffect(() => {
-    if (!loaded) return;
+  /* persist
+     Debounced, so a burst of taps is one write — but the debounce window is
+     exactly when a tab gets hidden or closed. `pendingSaveRef` holds the
+     snapshot that hasn't been written yet; the sync engine's pagehide /
+     hidden flush calls flushPendingSave() first, so it pushes the real
+     latest state rather than whatever the last timer happened to write. */
+  const pendingSaveRef = useRef(null);
+  const writePendingSave = () => {
     clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      storage.set(CURRENT_KEY, JSON.stringify({
-        players, matches, goals, mode, config, modeState, stakes, tournamentId, historySaved, schemaVersion: 2,
-      })).catch(() => {});
-    }, 1500);
+    const payload = pendingSaveRef.current;
+    if (payload === null) return;
+    pendingSaveRef.current = null;
+    // Identical to what is already cached (a reload that changed nothing): a
+    // write would only mark the tournament unsynced and bump the server
+    // version, which later reads as this device having edited it.
+    try { if (localStorage.getItem(CURRENT_KEY) === payload) return; } catch { /* storage unavailable: just try the write */ }
+    storage.set(CURRENT_KEY, payload).catch(() => {});
+  };
+  useEffect(() => {
+    if (!loaded) return undefined;
+    pendingSaveRef.current = JSON.stringify({
+      players, matches, goals, mode, config, modeState, stakes, tournamentId, historySaved, schemaVersion: 2,
+    });
+    clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(writePendingSave, 1500);
     return () => clearTimeout(saveTimeoutRef.current);
+    // writePendingSave only touches refs, so it is stable
   }, [players, matches, goals, mode, config, modeState, stakes, tournamentId, historySaved, loaded]);
+  useEffect(() => registerPreFlush(writePendingSave), []);
 
   const nameOf = (id) => players.find((p) => p.id === id)?.name ?? "?";
 

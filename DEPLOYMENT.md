@@ -40,8 +40,11 @@ accounts and cross-device sync on top of it.
    mysql --host=<DB_HOST> --port=<DB_PORT> --user=<DB_USER> -p <DB_NAME> < migrations/001_init.sql
    ```
 
-   See [`migrations/README.md`](migrations/README.md) — the file is
-   idempotent, so re-running it is safe.
+   Then apply every later file in `migrations/` in numeric order
+   (`002_…`, `003_…`). **Apply a migration before deploying the API version
+   that needs it** — the handlers name the new columns. See
+   [`migrations/README.md`](migrations/README.md); every file is idempotent,
+   so re-running one is safe.
 
 2. **Set the API's environment variables** in the Vercel project settings
    (**Settings → Environment Variables**), for Production, Preview, and

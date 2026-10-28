@@ -15,9 +15,11 @@ export function AuthProvider({ children }) {
       try {
         const res = await apiRequest("/auth/me");
         setUser(res.user);
-        setSessionActive(true);
+        setSessionActive(true, res.user.id);
       } catch {
-        setSessionActive(false);
+        // Not signed in, or just offline at startup — either way this is not a
+        // sign-out, so anything the last session left unsent stays queued.
+        setSessionActive(false, undefined, { keepPending: true });
       } finally {
         setReady(true);
       }
@@ -32,7 +34,7 @@ export function AuthProvider({ children }) {
   const login = useCallback(async ({ email, password }) => {
     const res = await apiRequest("/auth/login", { method: "POST", body: { email, password } });
     setUser(res.user);
-    setSessionActive(true);
+    setSessionActive(true, res.user.id);
     return res.user;
   }, []);
 
@@ -42,7 +44,7 @@ export function AuthProvider({ children }) {
       body: { email, password, displayName, inviteCode },
     });
     setUser(res.user);
-    setSessionActive(true);
+    setSessionActive(true, res.user.id);
     return res.user;
   }, []);
 
