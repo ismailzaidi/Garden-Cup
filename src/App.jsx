@@ -10,6 +10,7 @@ import HistoryView from "./views/HistoryView.jsx";
 import StakesCard from "./components/StakesCard.jsx";
 import SyncIndicator from "./components/SyncIndicator.jsx";
 import InstallPrompt from "./components/InstallPrompt.jsx";
+import ConflictBanner from "./components/ConflictBanner.jsx";
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
 import { exportData, importData } from "./lib/exportImport.js";
@@ -151,11 +152,13 @@ function TournamentShell() {
         {importError && <p className="mt-2 text-[10px] font-semibold" style={{ color: "#F7C9C2" }}>{importError}</p>}
       </div>
 
+      {mode === "cloud" && <ConflictBanner />}
+
       {importPrompt && (
         <div className="mx-4 mt-4 rounded-2xl p-4 flex items-start justify-between gap-3" style={{ backgroundColor: "#fff", border: `2px solid ${C.line}` }}>
           <div>
             <p className="text-sm font-bold" style={{ color: C.ink }}>Import the data already on this device?</p>
-            <p className="text-xs mt-1" style={{ color: C.sub }}>Your account has no saved tournaments yet, but this device does — from this sign-in or a previous one. Only import it if it's yours. Nothing is deleted either way.</p>
+            <p className="text-xs mt-1" style={{ color: C.sub }}>Your account has no tournament in progress, but this device does — from this sign-in or a previous one. Only import it if it's yours. Nothing is deleted either way.</p>
           </div>
           <div className="flex flex-col gap-1.5 flex-shrink-0">
             <button onClick={confirmImport} className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ backgroundColor: C.pitch, color: "#F7F5EE" }}>Import</button>

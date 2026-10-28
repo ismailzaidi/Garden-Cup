@@ -114,6 +114,18 @@ signal mid-tournament keeps working normally; goals sync once the connection
 comes back. On first sign-in on a new device, existing local data is never
 imported automatically — you're asked first.
 
+Nothing waits in memory only: whether the tournament in progress is ahead of
+the server, and every queued write (a finished tournament's history record, a
+delete, a clear), is kept in `localStorage` and retried — with backoff, when
+the browser comes back online, and after a reload. On load, unsynced local
+work is pushed up first rather than replaced by the server's copy, history is
+merged by record id, and the tournament in progress is never deleted just
+because the server has none. If another device saved a different version in the
+meantime, this device takes the server's version but keeps its own: a banner
+offers **Restore my version**. The debounced save is also flushed when the tab
+is hidden or closed. Signing out clears the queue; a session that merely
+expired keeps it for the same account.
+
 Clearing browser data (or never configuring an API at all) erases anything
 that hasn't been exported or synced.
 
@@ -140,8 +152,13 @@ Ali's row, the same rows their solo wins go on, never on a row called
 read the same way.
 
 Teams are saved on each History record, so they travel in the export file
-with everything else. They are not stored by the cloud backend: signed in, a
-tournament pulled back down from the server comes back without them.
+with everything else. The cloud backend stores them too (migration
+`003_lossless_state.sql`): a team's members on the live tournament, and the
+`teams` map on each finished History record. Signed in, a tournament or a
+record pulled back down comes back exactly as it was saved — the same goes for
+the prize and forfeit, the cards shown in a match, a dealt rule's level, and
+the World Cup groups. If you run your own backend, apply that migration
+**before** deploying this version of `api/`.
 
 ## Prizes and the last place forfeit
 
