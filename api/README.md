@@ -40,6 +40,15 @@ Without the first two every route replies `503 not_configured`.
 | `/api/history` | GET, POST, DELETE | Finished tournaments. POST is idempotent on the record's id. |
 | `/api/history/:clientId` | DELETE | One history record. |
 
+## Rate limits
+
+Every route except `me` and `logout` calls `rateLimit` from
+[`_lib/rateLimit.js`](_lib/rateLimit.js) before doing any work, keyed on the
+real client IP (Vercel's own `x-vercel-forwarded-for`), the email, or the
+account, as fits the route. Over the limit is `429 too_many_requests` with a
+`Retry-After` header in seconds. The limits and why they are set where they
+are: DEPLOYMENT.md, "Rate limits". A new route must add a limit too.
+
 ## Request/response shape
 
 Every route returns `application/json`. Errors are always

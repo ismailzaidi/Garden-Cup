@@ -4,11 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // from vi.hoisted() — see the same note in exportImport.test.js.
 const { hasApiMock, apiRequestMock, onUnauthorizedMock, MockApiError } = vi.hoisted(() => {
   class MockApiError extends Error {
-    constructor(status, code, message, body = null) {
+    constructor(status, code, message, body = null, retryAfter = 0) {
       super(message);
       this.status = status;
       this.code = code;
       this.body = body;
+      this.retryAfter = retryAfter;
     }
   }
   return {
@@ -182,6 +183,30 @@ describe("cloud mode, signed in — current tournament", () => {
       expect(sync.getStatus()).toBe("offline");
 
       await vi.advanceTimersByTimeAsync(2000);
+      expect(apiRequestMock).toHaveBeenCalledTimes(2);
+      expect(sync.getStatus()).toBe("synced");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps a rate-limited (429) save and retries it after Retry-After, not sooner", async () => {
+    vi.useFakeTimers();
+    try {
+      setCurrentCache({ mode: "king" });
+      apiRequestMock
+        .mockRejectedValueOnce(new MockApiError(429, "too_many_requests", "slow down", null, 30))
+        .mockResolvedValueOnce({ version: 1 });
+
+      sync.setCurrent();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(sync.getStatus()).toBe("offline");
+      expect(localStorage.getItem(DIRTY_KEY)).toBe("1"); // not dropped
+
+      await vi.advanceTimersByTimeAsync(5_000); // past the normal first backoff
+      expect(apiRequestMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(25_000);
       expect(apiRequestMock).toHaveBeenCalledTimes(2);
       expect(sync.getStatus()).toBe("synced");
     } finally {
@@ -389,6 +414,23 @@ describe("outbox (one retry slot per operation, not one for everything)", () => 
     await new Promise((r) => setTimeout(r, 0));
     expect(apiRequestMock).toHaveBeenCalledTimes(2);
     expect(localStorage.getItem(OUTBOX_KEY)).toBeNull();
+  });
+
+  it("keeps a rate-limited (429) history write queued instead of dropping it", async () => {
+    vi.useFakeTimers();
+    try {
+      apiRequestMock
+        .mockRejectedValueOnce(new MockApiError(429, "too_many_requests", "slow down", null, 10))
+        .mockResolvedValue(null);
+      sync.addHistory({ id: "h1" });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(JSON.parse(localStorage.getItem(OUTBOX_KEY))).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(apiRequestMock).toHaveBeenCalledTimes(2);
+      expect(localStorage.getItem(OUTBOX_KEY)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("a delete of the current tournament is queued and retried, and a later setCurrent supersedes it", async () => {

@@ -93,4 +93,45 @@ begin
   assert (select count(*) from public.tournament_history where user_id = '00000000-0000-0000-0000-00000000000a') = 0, 'cascade history';
 end $$;
 
+-- ---------- rate limits ----------
+set role anon;
+do $$
+declare r jsonb; b text := repeat('a', 64);
+begin
+  r := public.rate_limit_hit(b, 2, 60);
+  assert (r ->> 'allowed')::boolean, format('1st hit allowed: %s', r);
+  r := public.rate_limit_hit(b, 2, 60);
+  assert (r ->> 'allowed')::boolean, format('2nd hit allowed: %s', r);
+  r := public.rate_limit_hit(b, 2, 60);
+  assert not (r ->> 'allowed')::boolean, format('3rd hit refused: %s', r);
+  assert (r ->> 'retry_after')::int between 1 and 60, format('retry_after in the window: %s', r);
+
+  -- a different bucket has its own count
+  r := public.rate_limit_hit(repeat('b', 64), 2, 60);
+  assert (r ->> 'allowed')::boolean, 'separate buckets';
+
+  begin
+    perform public.rate_limit_hit('not-a-hash', 2, 60);
+    assert false, 'a bucket must be a sha256 hex';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform 1 from public.rate_limits;
+    assert false, 'anon must not read rate_limits';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+
+set role authenticated;
+set request.jwt.claims = '{"sub":"00000000-0000-0000-0000-00000000000b"}';
+do $$
+begin
+  begin
+    delete from public.rate_limits;
+    assert false, 'a signed-in user must not reset rate limits';
+  exception when insufficient_privilege then null;
+  end;
+end $$;
+reset role;
+
 \echo 'rls.sql: all checks passed'

@@ -1,6 +1,7 @@
 import { sendJson, sendError, methodGuard, withErrorHandling, bodyTooLarge } from "../_lib/http.js";
 import { createRequestClient, supabaseConfigured } from "../_lib/supabase.js";
 import { authErrorResponse } from "../_lib/authErrors.js";
+import { rateLimit, clientIp } from "../_lib/rateLimit.js";
 
 /* "Forgot password?": emails a reset link (the Reset Password template in
    DEPLOYMENT.md points it at /api/auth/confirm). The reply is the same
@@ -17,6 +18,7 @@ export default withErrorHandling(async (req, res) => {
   if (!email || email.length > 190 || !EMAIL_RE.test(email)) return sendError(res, 422, "invalid_email", "Enter a valid email address");
 
   const db = createRequestClient(req, res);
+  if (!(await rateLimit(res, db, [["forgotIp", clientIp(req)], ["forgotEmail", email]]))) return;
   const { error } = await db.auth.resetPasswordForEmail(email);
   if (error && (error.status === 429 || String(error.code).startsWith("over_"))) return authErrorResponse(res, error);
   if (error) console.error(error);

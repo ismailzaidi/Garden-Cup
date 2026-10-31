@@ -2,6 +2,7 @@ import { sendJson, sendError, methodGuard, withErrorHandling, bodyTooLarge } fro
 import { createRequestClient, supabaseConfigured } from "../_lib/supabase.js";
 import { publicUser } from "../_lib/auth.js";
 import { authErrorResponse } from "../_lib/authErrors.js";
+import { rateLimit, clientIp } from "../_lib/rateLimit.js";
 
 /* Supabase Auth checks the password and rate-limits attempts; a success
    writes the session cookies through the request client. */
@@ -16,7 +17,9 @@ export default withErrorHandling(async (req, res) => {
   }
 
   const db = createRequestClient(req, res);
-  const { data, error } = await db.auth.signInWithPassword({ email: email.trim().toLowerCase(), password });
+  const cleanEmail = email.trim().toLowerCase();
+  if (!(await rateLimit(res, db, [["loginIp", clientIp(req)], ["loginEmail", cleanEmail]]))) return;
+  const { data, error } = await db.auth.signInWithPassword({ email: cleanEmail, password });
   if (error) return authErrorResponse(res, error);
 
   sendJson(res, 200, { user: publicUser(data.user) });

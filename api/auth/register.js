@@ -2,6 +2,7 @@ import { sendJson, sendError, methodGuard, withErrorHandling, bodyTooLarge } fro
 import { createRequestClient, supabaseConfigured } from "../_lib/supabase.js";
 import { publicUser } from "../_lib/auth.js";
 import { authErrorResponse } from "../_lib/authErrors.js";
+import { rateLimit, clientIp } from "../_lib/rateLimit.js";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -26,6 +27,7 @@ export default withErrorHandling(async (req, res) => {
   if (!name) return sendError(res, 422, "invalid_display_name", "Enter a display name");
 
   const db = createRequestClient(req, res);
+  if (!(await rateLimit(res, db, [["registerIp", clientIp(req)]]))) return;
   const { data, error } = await db.auth.signUp({
     email: email.trim().toLowerCase(),
     password,

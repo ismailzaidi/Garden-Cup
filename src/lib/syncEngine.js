@@ -136,9 +136,17 @@ let retryDelayIndex = 0;
 // One timer for everything pending: when several operations fail at once
 // (the usual case — it's the network, not the operations), they share it
 // rather than each pushing the backoff further out.
-function scheduleRetry() {
+/* A rejection the server means: the write itself is wrong (validation and
+   the like), so sending it again can't help. 401 isn't one (the session
+   dropped; handled by onUnauthorized), and nor is 429: rate limited means
+   "later", never "drop it". */
+const isPermanentRejection = (e) => e instanceof ApiError && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 429;
+// a 429 says how long to wait; never retry sooner than that
+const retryAfterMs = (e) => (e instanceof ApiError && e.status === 429 ? e.retryAfter * 1000 : 0);
+
+function scheduleRetry(minDelayMs = 0) {
   if (retryTimer) return;
-  const delay = RETRY_DELAYS[Math.min(retryDelayIndex, RETRY_DELAYS.length - 1)];
+  const delay = Math.max(minDelayMs, RETRY_DELAYS[Math.min(retryDelayIndex, RETRY_DELAYS.length - 1)]);
   retryDelayIndex = Math.min(retryDelayIndex + 1, RETRY_DELAYS.length - 1);
   retryTimer = setTimeout(() => { retryTimer = null; drainAll(); }, delay);
 }
@@ -287,14 +295,14 @@ async function runPushCurrent() {
         setStatus("offline");
         scheduleRetry();
       }
-    } else if (e instanceof ApiError && e.status >= 400 && e.status < 500 && e.status !== 401) {
+    } else if (isPermanentRejection(e)) {
       // Not retryable — the server rejected the write itself (validation, etc.)
       markClean();
       setStatus("error");
     } else {
-      // network_error (status 0), 401 (session drop is handled by onUnauthorized), or 5xx — retry
+      // network_error (status 0), 401 (session drop is handled by onUnauthorized), 429 or 5xx — retry
       setStatus("offline");
-      scheduleRetry();
+      scheduleRetry(retryAfterMs(e));
     }
   } finally {
     pushInFlight = false;
@@ -361,12 +369,12 @@ async function runOutbox() {
           await sendOp(op);
           if (op.type === "currentDelete") setVersion(0);
         } catch (e) {
-          if (e instanceof ApiError && e.status >= 400 && e.status < 500 && e.status !== 401) {
+          if (isPermanentRejection(e)) {
             // the server rejected this write itself — retrying can't help
             setStatus("error");
           } else {
             setStatus("offline");
-            scheduleRetry();
+            scheduleRetry(retryAfterMs(e));
             return;
           }
         }

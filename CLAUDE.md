@@ -25,6 +25,9 @@ setting that password once with
 - The browser never talks to Supabase; `api/` does, as the signed-in user
   (`api/_lib/supabase.js`). The service-role key is used only to delete an
   account (`api/account.js`); never use it for data queries.
+- Every API route is rate limited (`api/_lib/rateLimit.js`); a new route
+  gets a limit too. The client must treat 429 as "retry later", never as a
+  rejected write.
 - Vercel's free plan allows 12 functions (one per route file, 10 in use):
   add a method to an existing route before adding a file.
 

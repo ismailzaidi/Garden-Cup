@@ -14,12 +14,13 @@ export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/,
 export const hasApi = () => Boolean(API_BASE);
 
 export class ApiError extends Error {
-  constructor(status, code, message, body = null) {
+  constructor(status, code, message, body = null, retryAfter = 0) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.body = body; // parsed JSON response body, when there was one (e.g. a 409's {version, state})
+    this.retryAfter = retryAfter; // seconds, from a 429's Retry-After header
   }
 }
 
@@ -51,7 +52,8 @@ export async function apiRequest(path, { method = "GET", body, keepalive = false
   if (!res.ok) {
     let parsed = null;
     try { parsed = await res.json(); } catch { /* no body */ }
-    throw new ApiError(res.status, parsed?.error ?? "http_error", parsed?.message ?? res.statusText, parsed);
+    const retryAfter = Number(res.headers?.get?.("Retry-After")) || 0;
+    throw new ApiError(res.status, parsed?.error ?? "http_error", parsed?.message ?? res.statusText, parsed, retryAfter);
   }
 
   if (res.status === 204) return null;

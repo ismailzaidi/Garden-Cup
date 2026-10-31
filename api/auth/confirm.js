@@ -1,5 +1,6 @@
 import { methodGuard, withErrorHandling } from "../_lib/http.js";
 import { createRequestClient, supabaseConfigured } from "../_lib/supabase.js";
+import { checkLimits, clientIp } from "../_lib/rateLimit.js";
 
 /* The links in the "confirm your email" and "reset your password" messages
    land here (see the email templates in DEPLOYMENT.md). A good link signs
@@ -15,9 +16,13 @@ export default withErrorHandling(async (req, res) => {
   let ok = false;
   if (supabaseConfigured() && tokenHash && TYPES.has(type)) {
     const db = createRequestClient(req, res);
-    const { error } = await db.auth.verifyOtp({ type, token_hash: tokenHash });
-    ok = !error;
-    if (error) console.error(error);
+    // over the limit: treated like a bad link, so the app shows its message
+    const limit = await checkLimits(db, [["confirmIp", clientIp(req)]]);
+    if (limit.ok) {
+      const { error } = await db.auth.verifyOtp({ type, token_hash: tokenHash });
+      ok = !error;
+      if (error) console.error(error);
+    }
   }
   res.setHeader("Cache-Control", "no-store");
   const done = type === "recovery" ? "/?reset=1" : "/?confirmed=1";

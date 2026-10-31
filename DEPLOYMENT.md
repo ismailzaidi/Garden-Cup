@@ -63,9 +63,9 @@ accounts and cross-device sync on top of it.
      <a href="{{ .SiteURL }}/api/auth/confirm?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>
      ```
 
-   - **SMTP**: set up a custom SMTP sender before launch. Supabase's built-in
-     email is for testing only and sends just a handful of emails an hour,
-     which will block real sign-ups.
+   - **SMTP**: set up your own email sender before launch; see
+     [How the emails are sent](#how-the-emails-are-sent).
+   - **Rate Limits**: see [Rate limits](#rate-limits) for what to change.
 
 4. **Set the API's environment variables** in Vercel (**Settings →
    Environment Variables**), for Production, Preview and Development
@@ -99,6 +99,73 @@ No credential, hostname, or connection string belongs in this repo at any
 point: not in a commit, not in a comment, not in an example. Only variable
 *names* are documented; values live in Vercel's environment variable store
 (or a gitignored local `.env.local` for `vercel dev`).
+
+## How the emails are sent
+
+Garden Cup's own code never sends email. Supabase Auth does, when the API
+asks it to:
+
+| What the person does | API route | Supabase sends | Template | The link goes to |
+|---|---|---|---|---|
+| Creates an account | `POST /api/auth/register` | "Confirm your email" | Confirm signup | `/api/auth/confirm?type=email`, which signs them in and opens Home |
+| Taps "Forgot password?" | `POST /api/auth/forgot` | "Reset your password" | Reset Password | `/api/auth/confirm?type=recovery`, which signs them in and opens My account to set a new password |
+
+The wording is edited in the Supabase dashboard (**Authentication → Email
+Templates**); only the link in each must match the ones in step 3 above.
+
+**Delivery.** Supabase's built-in sender is for trying things out only: it
+sends very few emails an hour and may only deliver to your own team's
+addresses. For real users, connect an email provider:
+
+1. Sign up with a transactional email provider (Resend, Postmark, Amazon
+   SES and Brevo all work; Resend and Postmark are the quickest to set up).
+2. Verify a sending domain with them, e.g. `mail.gardencup.app`. They give
+   you DNS records (SPF, DKIM, and ideally DMARC) to add at your domain's
+   DNS host. Without these, emails land in spam.
+3. In Supabase, **Authentication → Emails → SMTP Settings**: turn on custom
+   SMTP and enter the provider's host, port, username and password, a
+   sender address such as `no-reply@mail.gardencup.app`, and the sender
+   name `Garden Cup`.
+4. Send yourself a sign-up and a password reset to check both arrive.
+
+## Rate limits
+
+Two layers, so neither a bot nor a buggy device can hammer the service or
+run up email costs:
+
+**1. In the API (built in; nothing to set up).** Every route counts
+requests in Postgres (`rate_limit_hit`, in `supabase/migrations/`) and
+replies `429 Too Many Requests` with a `Retry-After` header when over:
+
+| What | Limit |
+|---|---|
+| Sign in | 30 per 15 min per IP address, and 10 per 15 min per email |
+| Create an account | 5 per hour per IP address |
+| Forgot password | 5 per hour per IP address, and 3 per hour per email |
+| Email links opened | 20 per 15 min per IP address |
+| Change password / delete account | 10 per 15 min per account |
+| Change display name | 20 per hour per account |
+| Saving and loading tournaments and history | 600 per 5 min per account (far above real play) |
+
+Only hashes are stored: no email or IP address goes into the table. The
+numbers live in `LIMITS` in `api/_lib/rateLimit.js`. If the limiter can't
+reach the database, requests are let through rather than locking everyone
+out. The app treats a 429 on a save as "try later": the save stays queued
+and is retried after the `Retry-After` time, never dropped.
+
+**2. In Supabase Auth (dashboard: Authentication → Rate Limits).**
+Supabase counts some limits per IP address, but every request reaches it
+from Vercel's servers, so to Supabase all your users share a handful of
+addresses. Left at the defaults, a busy evening could hit them for
+everyone. So:
+
+- **Raise** the per-IP limits for sign-ins/sign-ups and token
+  verifications well above the defaults (for example to their maximum).
+  The API's own per-person limits above take over that job.
+- **Keep** "emails sent per hour" as a deliberate overall cap. Once your
+  own SMTP is connected, set it to what your email provider plan allows
+  (for example 100 an hour to start). It caps the damage if anything gets
+  past the limits above.
 
 ## Deploying database changes
 

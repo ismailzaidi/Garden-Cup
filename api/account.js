@@ -2,6 +2,7 @@ import { sendJson, sendError, methodGuard, withErrorHandling, bodyTooLarge } fro
 import { requireAuth, publicUser } from "./_lib/auth.js";
 import { passwordMatches, adminConfigured, createAdminClient } from "./_lib/supabase.js";
 import { authErrorResponse } from "./_lib/authErrors.js";
+import { rateLimit } from "./_lib/rateLimit.js";
 
 /* My account, for the signed-in user:
  *   PATCH  { displayName }                     change the display name
@@ -23,6 +24,8 @@ export default withErrorHandling(async (req, res) => {
   if (!auth) return;
   const { user, db, raw } = auth;
   const body = req.body || {};
+  // a password is checked on POST and DELETE: few tries, so it can't be guessed
+  if (!(await rateLimit(res, db, [[req.method === "PATCH" ? "profileUser" : "passwordCheckUser", user.id]]))) return;
 
   if (req.method === "PATCH") {
     const name = typeof body.displayName === "string" ? body.displayName.trim().slice(0, 60) : "";
