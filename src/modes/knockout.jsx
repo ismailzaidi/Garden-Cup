@@ -48,6 +48,7 @@ export default {
   key: "knockout",
   label: "Knockout",
   desc: "Single elimination bracket",
+  age: "All ages",
   icon: Swords,
   minPlayers: 2,
   stages: ["knockout"],

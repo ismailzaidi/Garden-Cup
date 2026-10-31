@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent, within } from "@testing-library/react";
-import App from "../src/App.jsx";
+import { cleanup, screen, fireEvent, within } from "@testing-library/react";
+import { renderApp } from "./helpers/renderApp.jsx";
 
 // No real browser is available in this environment, so these drive the app
 // the same way a manual click-through would: through rendered text and
@@ -55,7 +55,7 @@ function addGoalForNameInLeg(name, legIndex) {
 
 describe("League + Final — full playthrough", () => {
   it("plays a group match, sets up the final, crowns a champion, and records history", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("1"); // legs per pairing
@@ -115,7 +115,7 @@ describe("League + Final — full playthrough", () => {
 
 describe("League + Final — best-of-3 settles early", () => {
   it("crowns a champion two legs up, leaving the third leg unplayed", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("1"); // legs per pairing
@@ -155,7 +155,7 @@ describe("League + Final — best-of-3 settles early", () => {
 
 describe("Knockout — full playthrough", () => {
   it("plays both rounds of a 4-player bracket to a champion", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     addPlayer("Cara");
@@ -191,7 +191,7 @@ describe("Knockout — full playthrough", () => {
 
 describe("Winner Stays On — full playthrough", () => {
   it("lets the king defend a streak to the configured target and crowns a champion", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     addPlayer("Cara");
@@ -222,7 +222,7 @@ describe("Winner Stays On — full playthrough", () => {
 
 describe("League with no final — full playthrough", () => {
   it("crowns the table leader with no final phase", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("No final");
@@ -246,7 +246,7 @@ describe("League with no final — full playthrough", () => {
 
 describe("Chaos Cup — full playthrough", () => {
   it("deals a twist to the fixture and crowns the table leader", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("Chaos Cup");
@@ -272,7 +272,7 @@ describe("Chaos Cup — full playthrough", () => {
 
 describe("Golden Boot Race — full playthrough", () => {
   it("crowns the first player to reach the goal target", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("Golden Boot Race");
@@ -297,7 +297,7 @@ describe("Golden Boot Race — full playthrough", () => {
 
 describe("Last One Standing — full playthrough", () => {
   it("knocks out the bottom player each round until one is left", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     addPlayer("Cara");
@@ -332,7 +332,7 @@ describe("Last One Standing — full playthrough", () => {
 
 describe("Penalty Shootout Cup — full playthrough", () => {
   it("plays a four-player shootout bracket through to a champion", async () => {
-    render(<App />);
+    renderApp();
     ["Alice", "Bob", "Cara", "Dee"].forEach(addPlayer);
     clickText("Penalty Shootout Cup");
     clickText("5"); // penalties per player
@@ -363,7 +363,7 @@ describe("Penalty Shootout Cup — full playthrough", () => {
 
 describe("Garden World Cup — full playthrough", () => {
   it("plays the group stage, the semis, and the final, and awards a bronze", async () => {
-    render(<App />);
+    renderApp();
     ["Alice", "Bob", "Cara", "Dee"].forEach(addPlayer);
     clickText("Garden World Cup");
     clickText("1"); // group games between each pair
@@ -438,7 +438,7 @@ describe("Result speech — marking a match played (5B)", () => {
 
   it("speaks a sentence naming both players on mark-played, and nothing on un-mark", async () => {
     const utterances = stubSpeechSynthesis();
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("1"); // legs per pairing
@@ -465,7 +465,7 @@ describe("Result speech — marking a match played (5B)", () => {
   });
 
   it("does not throw when there is no speech engine at all", async () => {
-    render(<App />); // window.speechSynthesis is left unset — the jsdom default
+    renderApp(); // window.speechSynthesis is left unset — the jsdom default
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("1");
@@ -482,7 +482,7 @@ describe("Result speech — marking a match played (5B)", () => {
 
 describe("config persists across mode switches", () => {
   it("keeps legCount selected after switching away and back, matching pre-refactor behaviour", () => {
-    render(<App />);
+    renderApp();
     clickText("1"); // legs per pairing, on the default League mode
     clickText("Knockout"); // knockout has no config picker
     clickText("League + Final"); // switch back
@@ -508,7 +508,7 @@ describe("loading a v1 saved blob (schema migration)", () => {
       historySaved: false,
     }));
 
-    render(<App />);
+    renderApp();
 
     // `tab` is never persisted (matches pre-refactor behaviour) — loading
     // always lands on Players, so switch to Arena to see the restored match.
@@ -532,7 +532,7 @@ describe("loading a v1 saved blob (schema migration)", () => {
       historySaved: false,
     }));
 
-    render(<App />);
+    renderApp();
 
     await screen.findByText(/Fixtures/);
     clickText(/Fixtures/);
@@ -543,7 +543,7 @@ describe("loading a v1 saved blob (schema migration)", () => {
 
 describe("Slow-play card", () => {
   it("needs two taps, takes a goal off the carded player, then gives the opponent one", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("No final");
@@ -580,7 +580,7 @@ describe("Slow-play card", () => {
 
 describe("Teams, a prize and a last place forfeit", () => {
   it("credits a team's win to each of its players and records what was played for", async () => {
-    render(<App />);
+    renderApp();
     clickText("Team");
     fireEvent.change(screen.getByPlaceholderText("Team name"), { target: { value: "Tigers" } });
     fireEvent.change(screen.getByPlaceholderText(/Who's in it/), { target: { value: "Sam, Ali" } });
@@ -630,7 +630,7 @@ describe("Teams, a prize and a last place forfeit", () => {
 
 describe("Prize and forfeit ideas", () => {
   it("pages through the ideas and draws a random one into the box", () => {
-    render(<App />);
+    renderApp();
     expect(screen.getByText("Set the table")).toBeInTheDocument();
     expect(screen.queryByText("No screen time tonight")).not.toBeInTheDocument();
 
@@ -651,7 +651,7 @@ describe("Prize and forfeit ideas", () => {
 
 describe("Red card", () => {
   it("docks 3 points in a league table, and can be taken back", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("No final");
@@ -681,7 +681,7 @@ describe("Red card", () => {
   });
 
   it("costs 2 goals in a knockout, where there is no table to dock", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("Knockout");
@@ -701,7 +701,7 @@ describe("Red card", () => {
 
 describe("Stats — cards", () => {
   it("lists who has been shown yellow and red cards, and who has the most", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("No final");
@@ -732,7 +732,7 @@ describe("Stats — cards", () => {
 
 describe("Rule order — easy to hard", () => {
   it("defaults Chaos to easy to hard, shows each match's level, and can be switched to mixed up", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     addPlayer("Cara");
@@ -748,7 +748,7 @@ describe("Rule order — easy to hard", () => {
   });
 
   it("shows no levels when the order is mixed up", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("Chaos Cup");
@@ -759,7 +759,7 @@ describe("Rule order — easy to hard", () => {
   });
 
   it("climbs Horror too, and shows a level on the sealed rules without giving them away", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     addPlayer("Cara");

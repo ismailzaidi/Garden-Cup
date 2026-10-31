@@ -47,8 +47,9 @@ export default function InstallPrompt() {
 
   return (
     <div
-      className="fixed bottom-0 inset-x-0 z-30 mx-4 mb-4 rounded-2xl p-4 flex items-center justify-between gap-3"
-      style={{ backgroundColor: "#fff", border: `2px solid ${C.line}`, paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+      className="fixed inset-x-0 z-30 mx-4 rounded-2xl p-4 flex items-center justify-between gap-3"
+      // sits just above the bottom navigation bar (components/BottomNav.jsx)
+      style={{ backgroundColor: "#fff", border: `2px solid ${C.line}`, bottom: "calc(4.5rem + env(safe-area-inset-bottom))" }}
     >
       <div className="flex items-center gap-3 min-w-0">
         <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: C.pitch }}>

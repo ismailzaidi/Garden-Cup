@@ -202,6 +202,7 @@ export default {
   key: "worldcup",
   label: "Garden World Cup",
   desc: "Group stage, semi-finals, then the final",
+  age: "All ages",
   icon: Globe,
   minPlayers: 4,
   stages: ["wcgroup", "wcko"],

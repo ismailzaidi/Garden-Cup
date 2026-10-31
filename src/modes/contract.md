@@ -12,6 +12,8 @@ export default {
   key: "knockout",                 // stable; also the value persisted as `mode`
   label: "Knockout",
   desc: "Single elimination bracket",
+  age: "All ages",                 // shown on the Home screen's mode cards;
+                                    // judged against docs/MODE-AUDIT.md
   icon: Swords,                    // a lucide-react component
   minPlayers: 2,
   maxPlayers: undefined,           // optional; omit for "no ceiling" (all four

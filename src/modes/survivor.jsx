@@ -159,6 +159,7 @@ export default {
   key: "survivor",
   label: "Last One Standing",
   desc: "Lowest scorer is knocked out every round",
+  age: "All ages",
   icon: Flame,
   minPlayers: 3,
   stages: ["survivor"],

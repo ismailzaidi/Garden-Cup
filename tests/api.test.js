@@ -6,9 +6,16 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
    scripts/test-db.sh. */
 
 let fake;
+let admin;
+const passwordCheck = vi.fn(async () => ({ ok: true }));
 vi.mock("../api/_lib/supabase.js", async (importOriginal) => {
   const real = await importOriginal();
-  return { ...real, createRequestClient: () => fake };
+  return {
+    ...real,
+    createRequestClient: () => fake,
+    createAdminClient: () => admin,
+    passwordMatches: (...args) => passwordCheck(...args),
+  };
 });
 
 const { default: current } = await import("../api/tournaments/current.js");
@@ -16,6 +23,9 @@ const { default: history } = await import("../api/history/index.js");
 const { default: register } = await import("../api/auth/register.js");
 const { default: login } = await import("../api/auth/login.js");
 const { default: confirm } = await import("../api/auth/confirm.js");
+const { default: forgot } = await import("../api/auth/forgot.js");
+const { default: logout } = await import("../api/auth/logout.js");
+const { default: account } = await import("../api/account.js");
 const { cookieMethods } = await import("../api/_lib/supabase.js");
 
 const USER = { id: "u-1", email: "sam@example.com", user_metadata: { display_name: "Sam" } };
@@ -57,6 +67,9 @@ function makeFake({ user = USER, from = {}, rpc } = {}) {
       signUp: vi.fn(),
       signInWithPassword: vi.fn(),
       verifyOtp: vi.fn(),
+      updateUser: vi.fn(),
+      resetPasswordForEmail: vi.fn(async () => ({ error: null })),
+      signOut: vi.fn(async () => ({ error: null })),
     },
     from: vi.fn((name) => { tables[name] = query(from[name] ?? { data: null, error: null }); return tables[name]; }),
     rpc: vi.fn(rpc ?? (async () => ({ data: { conflict: false, version: 1 }, error: null }))),
@@ -74,7 +87,11 @@ const state = () => ({
 beforeEach(() => {
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_ANON_KEY = "anon";
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "service";
   fake = makeFake();
+  admin = { auth: { admin: { deleteUser: vi.fn(async () => ({ error: null })) } } };
+  passwordCheck.mockReset();
+  passwordCheck.mockResolvedValue({ ok: true });
 });
 
 describe("session cookies", () => {
@@ -260,6 +277,121 @@ describe("/api/auth", () => {
 
     res = mockRes();
     await confirm(mockReq("GET", undefined, { query: { token_hash: "abc", type: "recovery" } }), res);
+    expect(res.headers.location).toBe("/?reset=1");
+
+    res = mockRes();
+    await confirm(mockReq("GET", undefined, { query: { token_hash: "abc", type: "invite" } }), res);
     expect(res.headers.location).toBe("/?confirm_error=1");
+
+    fake.auth.verifyOtp.mockResolvedValue({ error: { message: "expired" } });
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    res = mockRes();
+    await confirm(mockReq("GET", undefined, { query: { token_hash: "abc", type: "recovery" } }), res);
+    spy.mockRestore();
+    expect(res.headers.location).toBe("/?confirm_error=1");
+  });
+
+  it("forgot password replies the same whether or not the account exists", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    for (const error of [null, { status: 400, code: "user_not_found" }]) {
+      fake.auth.resetPasswordForEmail.mockResolvedValue({ error });
+      const res = mockRes();
+      await forgot(mockReq("POST", { email: " Sam@Example.com " }), res);
+      expect([res.statusCode, res.body]).toEqual([200, { sent: true }]);
+    }
+    spy.mockRestore();
+    expect(fake.auth.resetPasswordForEmail).toHaveBeenCalledWith("sam@example.com");
+
+    fake.auth.resetPasswordForEmail.mockResolvedValue({ error: { status: 429, code: "over_email_send_rate_limit" } });
+    const res = mockRes();
+    await forgot(mockReq("POST", { email: "sam@example.com" }), res);
+    expect(res.statusCode).toBe(429);
+  });
+
+  it("logout ends this device's session, or every session when asked", async () => {
+    await logout(mockReq("POST", {}), mockRes());
+    expect(fake.auth.signOut).toHaveBeenLastCalledWith({ scope: "local" });
+    await logout(mockReq("POST", { everywhere: true }), mockRes());
+    expect(fake.auth.signOut).toHaveBeenLastCalledWith({ scope: "global" });
+  });
+});
+
+describe("/api/account", () => {
+  it("PATCH changes the display name", async () => {
+    fake.auth.updateUser.mockResolvedValue({ data: { user: { ...USER, user_metadata: { display_name: "Sammy" } } }, error: null });
+    const res = mockRes();
+    await account(mockReq("PATCH", { displayName: "  Sammy " }), res);
+    expect(fake.auth.updateUser).toHaveBeenCalledWith({ data: { display_name: "Sammy" } });
+    expect(res.body.user.displayName).toBe("Sammy");
+
+    const res2 = mockRes();
+    await account(mockReq("PATCH", { displayName: "  " }), res2);
+    expect(res2.statusCode).toBe(422);
+  });
+
+  it("POST changes the password only with the right current password", async () => {
+    fake.auth.updateUser.mockResolvedValue({ data: {}, error: null });
+    let res = mockRes();
+    await account(mockReq("POST", { currentPassword: "old-password", newPassword: "new-password-1" }), res);
+    expect(res.statusCode).toBe(204);
+    expect(passwordCheck).toHaveBeenCalledWith("sam@example.com", "old-password");
+    expect(fake.auth.updateUser).toHaveBeenCalledWith({ password: "new-password-1" });
+
+    fake.auth.updateUser.mockClear();
+    passwordCheck.mockResolvedValue({ ok: false, error: { code: "invalid_credentials", status: 400 } });
+    res = mockRes();
+    await account(mockReq("POST", { currentPassword: "wrong", newPassword: "new-password-1" }), res);
+    expect([res.statusCode, res.body.error]).toEqual([403, "wrong_password"]);
+    expect(fake.auth.updateUser).not.toHaveBeenCalled();
+
+    res = mockRes();
+    await account(mockReq("POST", { currentPassword: "x", newPassword: "short" }), res);
+    expect(res.statusCode).toBe(422);
+  });
+
+  it("POST without the current password works only within an hour of a reset email", async () => {
+    fake.auth.updateUser.mockResolvedValue({ data: {}, error: null });
+    let res = mockRes();
+    await account(mockReq("POST", { newPassword: "new-password-1" }), res);
+    expect([res.statusCode, res.body.error]).toEqual([403, "current_password_required"]);
+
+    fake = makeFake({ user: { ...USER, recovery_sent_at: new Date(Date.now() - 2 * 3600e3).toISOString() } });
+    res = mockRes();
+    await account(mockReq("POST", { newPassword: "new-password-1" }), res);
+    expect(res.statusCode).toBe(403);
+
+    fake = makeFake({ user: { ...USER, recovery_sent_at: new Date(Date.now() - 5 * 60e3).toISOString() } });
+    fake.auth.updateUser.mockResolvedValue({ data: {}, error: null });
+    res = mockRes();
+    await account(mockReq("POST", { newPassword: "new-password-1" }), res);
+    expect(res.statusCode).toBe(204);
+    expect(passwordCheck).not.toHaveBeenCalled();
+  });
+
+  it("DELETE removes the account after checking the password, then signs out", async () => {
+    let res = mockRes();
+    await account(mockReq("DELETE", { password: "pw" }), res);
+    expect(res.statusCode).toBe(204);
+    expect(admin.auth.admin.deleteUser).toHaveBeenCalledWith("u-1");
+    expect(fake.auth.signOut).toHaveBeenCalledWith({ scope: "local" });
+
+    admin.auth.admin.deleteUser.mockClear();
+    passwordCheck.mockResolvedValue({ ok: false, error: { code: "invalid_credentials", status: 400 } });
+    res = mockRes();
+    await account(mockReq("DELETE", { password: "wrong" }), res);
+    expect(res.statusCode).toBe(403);
+    expect(admin.auth.admin.deleteUser).not.toHaveBeenCalled();
+
+    res = mockRes();
+    await account(mockReq("DELETE", {}), res);
+    expect(res.statusCode).toBe(422);
+  });
+
+  it("DELETE says so when the service key isn't set", async () => {
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const res = mockRes();
+    await account(mockReq("DELETE", { password: "pw" }), res);
+    expect([res.statusCode, res.body.error]).toEqual([503, "not_configured"]);
+    expect(admin.auth.admin.deleteUser).not.toHaveBeenCalled();
   });
 });

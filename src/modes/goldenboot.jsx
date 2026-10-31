@@ -142,6 +142,7 @@ export default {
   key: "goldenboot",
   label: "Golden Boot Race",
   desc: "First to score N goals in total wins",
+  age: "All ages",
   icon: Target,
   minPlayers: 2,
   stages: ["goldenboot"],

@@ -30,5 +30,5 @@ export async function requireAuth(req, res) {
     sendError(res, 401, "unauthorized", "Sign in required");
     return null;
   }
-  return { user: publicUser(data.user), db };
+  return { user: publicUser(data.user), db, raw: data.user };
 }

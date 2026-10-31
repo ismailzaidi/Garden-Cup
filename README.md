@@ -136,6 +136,13 @@ offers **Restore my version**. The debounced save is also flushed when the tab
 is hidden or closed. Signing out clears the queue; a session that merely
 expired keeps it for the same account.
 
+An account is never needed to play. The app opens on **Home**: start a
+tournament in any mode, the latest results, and the all-time leaders. With
+accounts set up, **My account** has the profile, password change (and
+"Forgot password?" on the sign-in screen), download and import of your
+data, sign out of this or every device, and **Delete my account**, which
+removes the account and everything saved to it at once.
+
 Clearing browser data (or never configuring an API at all) erases anything
 that hasn't been exported or synced.
 

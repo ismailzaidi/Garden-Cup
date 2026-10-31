@@ -1,6 +1,7 @@
 # Public launch plan (Supabase, consent, game modes first)
 
-Status: agreed. Phase 1 (Supabase foundation) is built; phases 2 onwards are not.
+Status: agreed. Phase 1 (Supabase foundation) and the account screens are built;
+the rest of phase 2 onwards is not.
 Replaces the earlier league plan.
 
 Garden Cup is a trading name of **ZD Wholesale Limited**, the data controller.
@@ -57,7 +58,7 @@ Supabase: Auth + Postgres (RLS: a row is visible only to its owner)
 - **Defence in depth:** the API queries with the user's session, not the
   service key, so Postgres row-level security (`user_id = auth.uid()`) still
   blocks a bug in a handler from reading someone else's data. The service key
-  will be needed only for account deletion (phase 2).
+  is used only for account deletion.
 - **Simpler storage:** tournaments and history are stored as `jsonb`
   documents, which is lossless by construction. `api/_lib/serializer.js`
   (about 400 lines) and its mapping tables are deleted.
@@ -79,7 +80,7 @@ user cascades to everything. The display name lives on the Supabase user
 (`user_metadata.display_name`), so there is no separate profiles table.
 
 Env vars: `SUPABASE_URL` and `SUPABASE_ANON_KEY` (server-side only).
-`SUPABASE_SERVICE_ROLE_KEY` arrives with account deletion in phase 2.
+`SUPABASE_SERVICE_ROLE_KEY` is used only by "Delete my account".
 
 ## Sign-up, consent and legal
 
@@ -114,9 +115,9 @@ advice. Also check whether the business must pay the UK ICO data protection
 fee; most organisations that process personal data do.
 
 ### Data rights built into the app
-- **Delete my account**: removes everything immediately (cascade), from
-  Settings.
-- **Download my data**: the existing JSON export, available to signed-in users.
+- **Delete my account** (built): removes everything immediately (cascade),
+  from My account, after the password and a typed DELETE.
+- **Download my data** (built): the JSON export, on My account.
 - **Data minimisation**: player names are capped at 24 characters, and the UI
   hint says "First name or nickname". There are no other fields about players.
 
@@ -130,13 +131,17 @@ Each phase is its own PR with tests, merged in order.
    confirmation. MariaDB, `migrations/`, `serializer.js` and the custom auth
    are removed. Access rules are tested on a real Postgres (`npm run test:db`,
    also in CI).
+   - **Account screens** (built): play without an account; a Home
+     dashboard (start any mode, recent results, all-time leaders); My
+     account (profile, change password, forgot password, download/import,
+     sign out of one or all devices, delete account).
 2. **Sign-up consent and legal pages**: the consent checkboxes, the `consents`
    table, re-consent on a version change, the Privacy, Terms, Safeguarding
-   and Cookie pages, and account deletion.
+   and Cookie pages.
 3. **Content fixes from the audit**: the "Change" and "Add" items in
    `MODE-AUDIT.md` (heading rule, face-height keeper rules, open-ended
-   forfeit, borrowed card-game names, food and exercise stakes), plus age
-   labels on each mode.
+   forfeit, borrowed card-game names, food and exercise stakes). Age
+   labels are already on each mode (Home).
 4. **Learn what people do**: cookieless, privacy-friendly analytics counting
    modes played, tournaments finished and return visits. Never names or
    free text.

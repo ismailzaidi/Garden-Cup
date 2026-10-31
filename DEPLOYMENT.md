@@ -56,14 +56,23 @@ accounts and cross-device sync on top of it.
      <a href="{{ .SiteURL }}/api/auth/confirm?token_hash={{ .TokenHash }}&type=email">Confirm your email</a>
      ```
 
+   - **Email Templates → Reset Password**: the same idea, for "Forgot
+     password?". The app opens on My account, ready for a new password:
+
+     ```html
+     <a href="{{ .SiteURL }}/api/auth/confirm?token_hash={{ .TokenHash }}&type=recovery">Set a new password</a>
+     ```
+
    - **SMTP**: set up a custom SMTP sender before launch. Supabase's built-in
      email is for testing only and sends just a handful of emails an hour,
      which will block real sign-ups.
 
 4. **Set the API's environment variables** in Vercel (**Settings →
    Environment Variables**), for Production, Preview and Development
-   individually: `SUPABASE_URL` and `SUPABASE_ANON_KEY` (see
-   [`api/README.md`](api/README.md)). Neither is prefixed `VITE_`; they're
+   individually: `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
+   `SUPABASE_SERVICE_ROLE_KEY` (see [`api/README.md`](api/README.md)). The
+   service-role key is only for "Delete my account"; without it that one
+   button replies "not set up" and everything else works. Neither is prefixed `VITE_`; they're
    read by the serverless functions only. Use a separate Supabase project
    for Preview/Development so test accounts never mix with real ones.
 

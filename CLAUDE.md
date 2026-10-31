@@ -23,8 +23,10 @@ setting that password once with
 - Additive first: the app and the migration deploy at the same time, so a
   release must work against both the old and the new schema.
 - The browser never talks to Supabase; `api/` does, as the signed-in user
-  (`api/_lib/supabase.js`). Don't introduce the service-role key without a
-  clear need.
+  (`api/_lib/supabase.js`). The service-role key is used only to delete an
+  account (`api/account.js`); never use it for data queries.
+- Vercel's free plan allows 12 functions (one per route file, 10 in use):
+  add a method to an existing route before adding a file.
 
 ## Game content
 Rules, prizes and forfeits are judged against `docs/MODE-AUDIT.md`. Never

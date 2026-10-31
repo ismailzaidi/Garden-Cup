@@ -1,10 +1,13 @@
-import { useRef, useState } from "react";
-import { RotateCcw, Download, Upload, LogOut, Volume2, VolumeX } from "lucide-react";
+import { useEffect, useState } from "react";
+import { RotateCcw, Volume2, VolumeX } from "lucide-react";
 import { C } from "./lib/theme.js";
 import { useTournament } from "./engine/useTournament.js";
 import { getVoicePref, setVoicePref, speakVoiceSample } from "./engine/audio.js";
 import SetupView from "./views/SetupView.jsx";
 import StatsView from "./views/StatsView.jsx";
+import HomeView from "./views/HomeView.jsx";
+import AccountView from "./views/AccountView.jsx";
+import BottomNav from "./components/BottomNav.jsx";
 import WinsView from "./views/WinsView.jsx";
 import HistoryView from "./views/HistoryView.jsx";
 import StakesCard from "./components/StakesCard.jsx";
@@ -13,28 +16,113 @@ import InstallPrompt from "./components/InstallPrompt.jsx";
 import ConflictBanner from "./components/ConflictBanner.jsx";
 import { AuthProvider, useAuth } from "./auth/AuthContext.jsx";
 import LoginScreen from "./auth/LoginScreen.jsx";
-import { exportData, importData } from "./lib/exportImport.js";
 import { useCloudReconciliation } from "./lib/reconcile.js";
-import { REMOTE_UPDATE_EVENT } from "./lib/syncEngine.js";
 
 export default function GardenCup() {
   return (
     <AuthProvider>
-      <AuthGate />
+      <AppShell />
     </AuthProvider>
   );
 }
 
-function AuthGate() {
-  const { mode, ready, user } = useAuth();
+/* Where an email link sent us (api/auth/confirm.js): ?confirmed=1 after
+   confirming an email, ?reset=1 after a "forgot password" link,
+   ?confirm_error=1 for a bad or expired link. Read once; the effect in
+   AppShell tidies it out of the address bar. */
+function readArrival() {
+  if (typeof window === "undefined") return null;
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("reset")) return "reset";
+  if (params.has("confirmed")) return "confirmed";
+  if (params.has("confirm_error")) return "confirm_error";
+  return null;
+}
+
+/* The three screens: Home (the dashboard), Play (the tournament itself) and
+   My account, plus the sign-in screen. Playing never needs an account:
+   with no one signed in, everything stays on this device as it always has,
+   and signing in adds sync on top. */
+function AppShell() {
+  const auth = useAuth();
+  const { mode, ready, user } = auth;
+  const t = useTournament();
+  const reconcile = useCloudReconciliation(mode, user);
+  const [arrival, setArrival] = useState(readArrival);
+  const [screen, setScreen] = useState(() => {
+    if (arrival === "reset") return "account";
+    if (arrival === "confirm_error") return "signin";
+    return "home";
+  });
+
+  useEffect(() => {
+    if (arrival && window.location.search) window.history.replaceState(null, "", window.location.pathname);
+  }, [arrival]);
+
+  // Signing in from the sign-in screen lands on Home.
+  useEffect(() => {
+    if (user && screen === "signin") setScreen("home");
+  }, [user, screen]);
 
   if (mode === "cloud" && !ready) {
     return <div className="min-h-screen w-full" style={{ backgroundColor: C.chalk }} />;
   }
-  if (mode === "cloud" && !user) {
-    return <LoginScreen />;
+  if (screen === "signin") {
+    return <LoginScreen onBack={() => setScreen("home")} linkError={arrival === "confirm_error"} />;
   }
-  return <TournamentShell />;
+
+  const inProgress = t.matches.length > 0 && !t.champion;
+
+  // A mode card on Home: a fresh tournament in that mode, same players.
+  const startMode = (key) => {
+    if (inProgress && !window.confirm("Start a new tournament? The one in progress will be cleared. Finished tournaments stay in History.")) return;
+    t.actions.resetAll();
+    t.actions.setMode(key);
+    setScreen("play");
+  };
+  const openTab = (tab) => { t.actions.setTab(tab); setScreen("play"); };
+
+  const banners = <Banners mode={mode} reconcile={reconcile} />;
+
+  return (
+    <>
+      {screen === "home" && (
+        <HomeView user={user} cloud={mode === "cloud"} history={t.history} winsTable={t.winsTable}
+          confirmed={arrival === "confirmed" && Boolean(user)} onDismissConfirmed={() => setArrival(null)}
+          banners={banners} onStartMode={startMode} onOpenTab={openTab} onSignIn={() => setScreen("signin")} />
+      )}
+      {screen === "play" && <TournamentShell t={t} banners={banners} />}
+      {screen === "account" && (
+        <AccountView auth={auth} resetPassword={arrival === "reset" && Boolean(user)} onResetDone={() => setArrival(null)}
+          banners={banners} onSignIn={() => setScreen("signin")} onSignedOut={() => setScreen("home")} />
+      )}
+      <BottomNav screen={screen} onChange={setScreen} inProgress={inProgress} signedIn={Boolean(user)} cloud={mode === "cloud"} />
+      <InstallPrompt />
+    </>
+  );
+}
+
+/* Shown under each screen's header: the sync conflict banner, and the
+   "import this device's data?" question after signing in. */
+function Banners({ mode, reconcile }) {
+  const { importPrompt, confirmImport, dismissImport } = reconcile;
+  return (
+    <>
+      {mode === "cloud" && <ConflictBanner />}
+      {importPrompt && (
+        <div className="mx-4 mt-4 rounded-2xl p-4 flex items-start justify-between gap-3" style={{ backgroundColor: "#fff", border: `2px solid ${C.line}` }}>
+          <div>
+            <p className="text-sm font-bold" style={{ color: C.ink }}>Import the data already on this device?</p>
+            <p className="text-xs mt-1" style={{ color: C.sub }}>Your account has no tournament in progress, but this device does — from this sign-in or a previous one. Only import it if it's yours. Nothing is deleted either way.</p>
+          </div>
+          <div className="flex flex-col gap-1.5 flex-shrink-0">
+            <button onClick={confirmImport} className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ backgroundColor: C.pitch, color: "#F7F5EE" }}>Import</button>
+            <button onClick={dismissImport} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ backgroundColor: "#EAE6D9", color: C.ink }}>Not now</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 const pillIconBtn = {
@@ -51,17 +139,14 @@ const pillIconBtn = {
 // in-progress state — stay enabled regardless of `matches.length`.
 const ALWAYS_ON = new Set(["setup", "wins", "history"]);
 
-function TournamentShell() {
-  const { mode, user, logout } = useAuth();
+function TournamentShell({ t, banners }) {
+  const { mode } = useAuth();
   const {
     players, nameInput, mode: tourneyMode, config, matches, goals, modeState, stakes, tab, history,
     activeMode, standings, champion, lastPlace, nameOf, topScorers, minuteData, cardCounts, quickestGoal, lastGasp, winsTable,
     timerControls, actions,
-  } = useTournament();
+  } = t;
 
-  const { importPrompt, confirmImport, dismissImport } = useCloudReconciliation(mode, user);
-  const fileInputRef = useRef(null);
-  const [importError, setImportError] = useState("");
   // Device-local, like the preference it reflects (see getVoicePref in
   // engine/audio.js) — read once at mount, never carried in useTournament's
   // state, so it isn't part of what exports or syncs.
@@ -87,21 +172,6 @@ function TournamentShell() {
 
   const subtitle = activeMode.subtitle({ config });
   const ModeView = activeMode.views[tab];
-
-  const handleImportFile = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    try {
-      const bundle = await importData(file);
-      setImportError("");
-      window.dispatchEvent(new CustomEvent(REMOTE_UPDATE_EVENT, {
-        detail: { current: bundle.current, history: bundle.history || [] },
-      }));
-    } catch (err) {
-      setImportError(err?.message || "Couldn't import that file.");
-    }
-  };
 
   return (
     <div className="min-h-screen w-full" style={{ backgroundColor: C.chalk, fontFamily: "'Inter', sans-serif" }}>
@@ -135,37 +205,11 @@ function TournamentShell() {
               aria-label={voiceOn ? "Turn voice off" : "Turn voice on"} aria-pressed={voiceOn} style={pillIconBtn}>
               {voiceOn ? <Volume2 size={12} color="#F7F5EE" /> : <VolumeX size={12} color="#F7F5EE" />}
             </button>
-            <button onClick={exportData} title="Export data" style={pillIconBtn}>
-              <Download size={12} color="#F7F5EE" />
-            </button>
-            <button onClick={() => fileInputRef.current?.click()} title="Import data" style={pillIconBtn}>
-              <Upload size={12} color="#F7F5EE" />
-            </button>
-            <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportFile} />
-            {mode === "cloud" && (
-              <button onClick={logout} title="Sign out" style={pillIconBtn}>
-                <LogOut size={12} color="#F7F5EE" />
-              </button>
-            )}
           </div>
         </div>
-        {importError && <p className="mt-2 text-[10px] font-semibold" style={{ color: "#F7C9C2" }}>{importError}</p>}
       </div>
 
-      {mode === "cloud" && <ConflictBanner />}
-
-      {importPrompt && (
-        <div className="mx-4 mt-4 rounded-2xl p-4 flex items-start justify-between gap-3" style={{ backgroundColor: "#fff", border: `2px solid ${C.line}` }}>
-          <div>
-            <p className="text-sm font-bold" style={{ color: C.ink }}>Import the data already on this device?</p>
-            <p className="text-xs mt-1" style={{ color: C.sub }}>Your account has no tournament in progress, but this device does — from this sign-in or a previous one. Only import it if it's yours. Nothing is deleted either way.</p>
-          </div>
-          <div className="flex flex-col gap-1.5 flex-shrink-0">
-            <button onClick={confirmImport} className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ backgroundColor: C.pitch, color: "#F7F5EE" }}>Import</button>
-            <button onClick={dismissImport} className="text-xs font-semibold px-3 py-1.5 rounded-full" style={{ backgroundColor: "#EAE6D9", color: C.ink }}>Not now</button>
-          </div>
-        </div>
-      )}
+      {banners}
 
       {/* Tabs */}
       <div className="sticky top-0 z-20 px-3 py-3" style={{ backgroundColor: C.chalk, borderBottom: `1px solid ${C.line}` }}>
@@ -181,7 +225,7 @@ function TournamentShell() {
         </div>
       </div>
 
-      <div className="px-4 py-5 pb-20 space-y-5">
+      <div className="px-4 py-5 pb-28 space-y-5">
         {tab === "setup" && (
           <SetupView players={players} nameInput={nameInput} mode={tourneyMode} config={config} matches={matches} activeMode={activeMode}
             stakes={stakes} knownNames={winsTable.map((r) => r.name)} actions={actions} />
@@ -204,8 +248,6 @@ function TournamentShell() {
           />
         )}
       </div>
-
-      <InstallPrompt />
     </div>
   );
 }

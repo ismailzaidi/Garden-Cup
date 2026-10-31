@@ -62,6 +62,7 @@ export default {
   key: "penalties",
   label: "Penalty Shootout Cup",
   desc: "A knockout decided entirely on pens",
+  age: "All ages",
   icon: Goal,
   minPlayers: 2,
   stages: ["pens"],
