@@ -98,8 +98,11 @@ Schema changes are files in `supabase/migrations/`, deployed by
 they reach `main`. Supabase keeps a list of the migrations it has run, so
 each deploy applies only the new files, in name order.
 
-**One-time setup.** In GitHub, **Settings → Secrets and variables → Actions
-→ New repository secret**, add:
+**One-time setup.** In GitHub, add these as **secrets** (not variables),
+either under **Settings → Secrets and variables → Actions → New repository
+secret**, or under **Settings → Environments → `production` → Environment
+secrets**. The environment must be named exactly `production`, because the
+deploy job uses that one:
 
 | Secret | Where it comes from |
 |---|---|
