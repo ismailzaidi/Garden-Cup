@@ -280,8 +280,8 @@ async function runPushCurrent() {
         resetBackoff();
         settleIfIdle();
       } else {
-        // Defensive only: api/_lib/serializer.js always composes the actual
-        // conflicting row now, so this shouldn't happen. If it ever does,
+        // Defensive only: the database's save_current_tournament always returns
+        // the conflicting row's state, so this shouldn't happen. If it ever does,
         // the corrected version above is still good — just retry the push
         // rather than claiming "synced" for a write that didn't land.
         setStatus("offline");

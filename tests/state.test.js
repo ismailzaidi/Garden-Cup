@@ -1,16 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { MODES } from "../src/modes/index.js";
 import { applyCard, applyRedCard } from "../src/engine/cards.js";
-import {
-  saveCurrentTournament, composeCurrentTournament, validateState, ValidationError,
-} from "../api/_lib/serializer.js";
-import { parseHistoryRecord, historyRowToRecord } from "../api/_lib/historyRecord.js";
-import { createFakeDb } from "./helpers/fakeDb.js";
+import { validateState, toStoredState, ValidationError } from "../api/_lib/state.js";
+import { parseHistoryRecord, toStoredRecord } from "../api/_lib/historyRecord.js";
 
 /* The cloud copy must give back exactly what the client saved. These tests
    play every mode through its real fixture/advance code (so a mode that
    starts keeping a new field on a match or in modeState is caught here) and
-   push the result through save -> compose against an in-memory database. */
+   push the result through validate -> the document that is stored. */
 
 // a small deterministic rng, so a failing mode reproduces
 function seeded(seed) {
@@ -78,13 +75,12 @@ function norm(v) {
   return v;
 }
 
-async function saveAndCompose(state, db = createFakeDb()) {
-  await saveCurrentTournament(db, "u1", 0, state);
-  const { state: out, version } = await composeCurrentTournament(db, "u1");
-  return { out, version, db };
+// what the server stores, after a JSON round trip as jsonb would give it
+function saveAndCompose(state) {
+  return { out: JSON.parse(JSON.stringify(toStoredState(validateState(state)))) };
 }
 
-describe("compose(save(state)) is lossless", () => {
+describe("the stored state is lossless", () => {
   for (const mode of MODES) {
     for (const withTeams of [false, true]) {
       it(`${mode.key}${withTeams ? " with teams" : ""}`, async () => {
@@ -130,33 +126,7 @@ describe("compose(save(state)) is lossless", () => {
     expect(wOut.matches.some((m) => m.thirdPlace === true)).toBe(true);
     expect(wOut.matches.filter((m) => m.stage === "wcgroup").every((m) => m.group === "A" || m.group === "B")).toBe(true);
   });
-
-  it("reads back a tournament saved before the new columns existed as having none of the new fields", async () => {
-    const db = createFakeDb();
-    const state = playOut(MODES[0], makePlayers(false), defaultConfig(MODES[0]), seeded(1));
-    delete state.stakes;
-    await saveAndCompose(state, db);
-    // simulate a row written before migration 003
-    db.tables.tournaments.forEach((r) => { delete r.stakes_json; delete r.mode_state_json; });
-    db.tables.players.forEach((r) => { delete r.members_json; });
-    db.tables.matches.forEach((r) => { delete r.extra_json; });
-    const { state: out } = await composeCurrentTournament(createDbView(db), "u1");
-    expect(out.stakes).toEqual({ prize: "", chore: "" });
-    expect(out.players.every((p) => p.members === undefined)).toBe(true);
-  });
 });
-
-// a view of the fake that tolerates the deleted columns (as a real NULL would be)
-function createDbView(db) {
-  return {
-    async query(sql, params) {
-      db.tables.tournaments.forEach((r) => { r.stakes_json ??= null; r.mode_state_json ??= null; });
-      db.tables.players.forEach((r) => { r.members_json ??= null; });
-      db.tables.matches.forEach((r) => { r.extra_json ??= null; });
-      return db.query(sql, params);
-    },
-  };
-}
 
 describe("validation of the new fields", () => {
   const base = () => {
@@ -210,19 +180,9 @@ describe("validation of the new fields", () => {
 });
 
 describe("history record round trip", () => {
-  // parseHistoryRecord -> the row the route inserts -> historyRowToRecord
+  // parseHistoryRecord -> the record the route stores (after jsonb)
   function viaRows(record) {
-    const p = parseHistoryRecord(record);
-    const header = {
-      client_id: p.clientId, played_at: p.playedAt, mode: p.mode, champion: p.champion,
-      top_scorer_name: p.topScorerName, top_scorer_goals: p.topScorerGoals, total_goals: p.totalGoals,
-      teams_json: p.teamsJson, prize: p.prize, chore: p.chore, last_place_json: p.lastPlaceJson,
-    };
-    const rows = p.players.map((name) => {
-      const r = p.resultByName.get(name);
-      return { name, played: r?.played ?? null, w: r?.w ?? null, d: r?.d ?? null, l: r?.l ?? null, gf: r?.gf ?? null, ga: r?.ga ?? null };
-    });
-    return historyRowToRecord(header, rows);
+    return JSON.parse(JSON.stringify(toStoredRecord(parseHistoryRecord(record))));
   }
 
   const full = {

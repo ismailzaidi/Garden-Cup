@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { LogIn, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { LogIn, UserPlus, MailCheck } from "lucide-react";
 import { C } from "../lib/theme.js";
 import { useAuth } from "./AuthContext.jsx";
 
@@ -9,19 +9,30 @@ const inputStyle = {
   color: C.ink,
 };
 
+// The confirmation link (api/auth/confirm.js) comes back to the app with
+// ?confirm_error=1 when it was bad or expired. Read here (no side effects,
+// so StrictMode's double call is harmless); tidied out of the address bar
+// by the effect below so a reload doesn't show it again.
+function readLinkError() {
+  if (typeof window === "undefined") return "";
+  if (!new URLSearchParams(window.location.search).has("confirm_error")) return "";
+  return "That confirmation link didn't work or has expired. Sign in to get a new one, or create the account again.";
+}
+
 export default function LoginScreen() {
   const { login, register } = useAuth();
+  const [linkError] = useState(readLinkError);
   const [mode, setMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [displayName, setDisplayName] = useState("");
-  // The server doesn't tell us up front whether an invite code is required
-  // (there's no live endpoint to probe it), so this field is always shown on
-  // register and labelled as optional — a server that requires one will
-  // simply reject a blank/wrong value with a normal error message below.
-  const [inviteCode, setInviteCode] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState(linkError);
+  const [sentTo, setSentTo] = useState(""); // set once sign-up is waiting on the email link
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (linkError) window.history.replaceState(null, "", window.location.pathname);
+  }, [linkError]);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -31,12 +42,12 @@ export default function LoginScreen() {
       if (mode === "login") {
         await login({ email: email.trim().toLowerCase(), password });
       } else {
-        await register({
+        const result = await register({
           email: email.trim().toLowerCase(),
           password,
           displayName: displayName.trim(),
-          inviteCode: inviteCode.trim() || undefined,
         });
+        if (result?.confirmationRequired) setSentTo(email.trim().toLowerCase());
       }
     } catch (err) {
       setError(err?.message || "Something went wrong. Try again.");
@@ -55,6 +66,22 @@ export default function LoginScreen() {
           </p>
         </div>
 
+        {sentTo ? (
+          <div className="rounded-2xl p-5 text-center" style={{ backgroundColor: "#fff", border: `2px solid ${C.line}` }}>
+            <MailCheck size={28} className="mx-auto" style={{ color: C.pitch }} />
+            <p className="mt-2 text-sm font-bold" style={{ color: C.ink }}>Check your email</p>
+            <p className="mt-1 text-xs" style={{ color: C.sub }}>
+              We sent a link to <strong>{sentTo}</strong>. Open it on this device to finish creating your account.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setSentTo(""); setMode("login"); setPassword(""); }}
+              className="mt-4 text-xs font-semibold" style={{ color: C.pitch }}
+            >
+              Back to sign in
+            </button>
+          </div>
+        ) : (
         <form onSubmit={submit} className="space-y-3 rounded-2xl p-5" style={{ backgroundColor: "#fff", border: `2px solid ${C.line}` }}>
           {mode === "register" && (
             <div>
@@ -89,18 +116,6 @@ export default function LoginScreen() {
             />
           </div>
 
-          {mode === "register" && (
-            <div>
-              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: C.sub }}>Invite code (if required)</label>
-              <input
-                type="text" value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value)}
-                className="mt-1 w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                style={inputStyle}
-              />
-            </div>
-          )}
-
           {error && (
             <p className="text-xs font-semibold px-3 py-2 rounded-xl" style={{ backgroundColor: "#FBE3DE", color: C.loss }}>{error}</p>
           )}
@@ -114,7 +129,9 @@ export default function LoginScreen() {
             {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
           </button>
         </form>
+        )}
 
+        {!sentTo && (
         <button
           type="button"
           onClick={() => { setMode((m) => (m === "login" ? "register" : "login")); setError(""); }}
@@ -123,6 +140,7 @@ export default function LoginScreen() {
         >
           {mode === "login" ? "New here? Create an account" : "Already have an account? Sign in"}
         </button>
+        )}
       </div>
     </div>
   );

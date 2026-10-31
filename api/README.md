@@ -1,58 +1,74 @@
 # API
 
-Vercel serverless functions (Node.js) that connect directly to the MariaDB
-database over TCP — no separate server to deploy. Vercel builds every file
-under `api/` (except the `_lib/` directory, which is shared code, not a
-route) into its own function, on the same deployment as the SPA. Because the
-frontend and API share an origin, there's no CORS to configure and no
-`VITE_API_BASE_URL` needed beyond `/api`.
+Vercel serverless functions (Node.js) on the same deployment as the SPA, so
+there's no CORS to configure and the front end only needs
+`VITE_API_BASE_URL=/api`. Vercel builds every file under `api/` (except
+`_lib/`, which is shared code, not a route) into its own function.
+
+Behind them is Supabase: **Supabase Auth** for accounts and sessions, and
+**Supabase Postgres** for the data. The browser never talks to Supabase. Each
+request builds a Supabase client that acts as the signed-in user
+([`_lib/supabase.js`](_lib/supabase.js)), so row-level security in the
+database applies to every query, on top of the checks in the handlers.
 
 ## Environment variables
 
 Set these in the Vercel project's settings (Production, Preview, and
-Development each have their own) — never in a committed file. `.env.local`
+Development each have their own), never in a committed file. `.env.local`
 works for `vercel dev` locally; it's already gitignored.
 
 | Name | Required | Notes |
 |---|---|---|
-| `DB_HOST` | yes | The database's hostname, reachable from the public internet. |
-| `DB_PORT` | no | Default `3306`. |
-| `DB_USER` | yes | |
-| `DB_PASS` | yes | |
-| `DB_NAME` | yes | |
-| `DB_SSL` | no | Set to `false` to disable TLS to the database. Defaults to on. |
-| `DB_SSL_REJECT_UNAUTHORIZED` | no | Set to `false` if the host uses a certificate that doesn't chain to a public CA (common on budget DB hosts). Leave unset/`true` when it does. |
-| `DB_POOL_SIZE` | no | Default `3`. Each warm serverless instance holds its own pool — the real ceiling on concurrent DB connections is `(concurrent instances) × DB_POOL_SIZE`. Check the database's own connection limit before raising this. |
-| `TOKEN_TTL_DAYS` | no | Default `90`. How long a session cookie stays valid. |
-| `SIGNUP_INVITE_CODE` | no | If set, `/api/auth/register` rejects any request whose `inviteCode` doesn't match — a simple gate against open registration on a public domain. **Leaving it unset means anyone who finds the URL can create an account.** Registration is still rate-limited per IP either way, but for anything beyond a private/household deployment, set this. |
+| `SUPABASE_URL` | yes | Project Settings → API → Project URL. |
+| `SUPABASE_ANON_KEY` | yes | Project Settings → API → the anon (publishable) key. Used server-side only, always with the user's session, so it can only do what row-level security lets that user do. |
 
-## Local development
+Without them every route replies `503 not_configured`. The service-role key
+is **not** used anywhere in this version; never set it as a Vercel variable
+until something needs it.
 
-Two ways to run this locally:
+## Routes
 
-- `npm run dev` (plain Vite) — no API, no database. `VITE_API_BASE_URL` is
-  unset, so the app runs in local-only mode (see `src/lib/storage.js` and
-  `src/lib/exportImport.js`). This is the normal day-to-day workflow for
-  frontend work.
-- `vercel dev` — serves the SPA and the `/api` functions together on one
-  origin, same as production. Needed to test login, sync, or anything under
-  `api/`. Requires a `.env.local` with the table above filled in and
-  `VITE_API_BASE_URL=/api`.
+| Route | Methods | What it does |
+|---|---|---|
+| `/api/auth/register` | POST | `{email, password, displayName}`. `201 {user}` if signed straight in, or `202 {confirmationRequired: true}` when the email link must be clicked first (the normal case). |
+| `/api/auth/confirm` | GET | The link in the confirmation email. Signs the user in and redirects to `/?confirmed=1`, or to `/?confirm_error=1`. |
+| `/api/auth/login` | POST | `{email, password}` → `{user}`. |
+| `/api/auth/logout` | POST | Ends this device's session. |
+| `/api/auth/me` | GET | `{user}` or 401. |
+| `/api/tournaments/current` | GET, PUT, DELETE | The tournament in progress. PUT is `{expectedVersion, state}` → `{version}`, or `409 {version, state}` when another device saved first. |
+| `/api/history` | GET, POST, DELETE | Finished tournaments. POST is idempotent on the record's id. |
+| `/api/history/:clientId` | DELETE | One history record. |
 
 ## Request/response shape
 
 Every route returns `application/json`. Errors are always
-`{ "error": "<code>", "message": "<text>" }` with a matching HTTP status — a
-raw database error never reaches the client; it's logged via
+`{ "error": "<code>", "message": "<text>" }` with a matching HTTP status. A
+raw database or Supabase error never reaches the client; it's logged via
 `console.error` (visible in the Vercel function logs) instead.
 
-Auth is a session cookie (`gc_session`, httpOnly + Secure + SameSite=Lax),
-set by `/auth/register` and `/auth/login`, cleared by `/auth/logout`. There's
-no bearer token in the client at all — same-origin `fetch` sends the cookie
-automatically, which is also why this only works when the SPA and the API
-are the same Vercel deployment.
+Sessions are Supabase Auth cookies, forced `HttpOnly`, `Secure` and
+`SameSite=Lax` by `_lib/supabase.js`. Same-origin `fetch` sends them
+automatically, so there is no token in the page's JavaScript at all.
 
-The routes under `api/auth/`, `api/tournaments/`, and `api/history/` are the
-source of truth for the exact endpoint list. The two serialisation traps
-(`s1`/`s2` as strings, array order as data) that `api/_lib/serializer.js`
-exists to get right are documented at the top of that file.
+## Data
+
+Saved tournaments and history records are each one `jsonb` document, in
+exactly the shape the client keeps. [`_lib/state.js`](_lib/state.js) and
+[`_lib/historyRecord.js`](_lib/historyRecord.js) validate them first: every
+field is either checked or dropped, and nothing that is checked is lost. The
+two traps a change there can break (`s1`/`s2` as strings, array order as
+data) are documented at the top of `state.js`, and `tests/state.test.js`
+plays every mode through to prove the round trip is lossless.
+
+The schema, its row-level security and the `save_current_tournament`
+function are in [`../supabase/migrations/`](../supabase/migrations/);
+`npm run test:db` runs the access-rule tests against a real Postgres.
+
+## Local development
+
+- `npm run dev` (plain Vite): no API, no database, local-only mode. This
+  is the normal day-to-day workflow for frontend work.
+- `vercel dev`: serves the SPA and the `/api` functions together on one
+  origin, as in production. Needed to test sign-in or sync. Requires a
+  `.env.local` with the variables above and `VITE_API_BASE_URL=/api`. Point
+  it at a separate Supabase project for development, never production.

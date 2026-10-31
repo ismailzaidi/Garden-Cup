@@ -41,9 +41,9 @@ implements, [`src/modes/contract.md`](src/modes/contract.md).
                                                                      │
                                     Vite/React SPA  +  api/*  (Node.js serverless)
                                                                      │
-                                                          TCP, TLS, mariadb driver
+                                                    HTTPS, as the signed-in user
                                                                      ▼
-                                                          MariaDB (optional)
+                                                 Supabase: Auth + Postgres (optional)
 ```
 
 The frontend and API are one Vercel deployment — no separate host, no CORS,
@@ -56,8 +56,8 @@ backend at all.
 | UI | React 18, Vite 5, Tailwind CSS |
 | State/persistence engine | Plain hooks (`src/engine/`) — no external state library |
 | API | Node.js serverless functions (`api/`), no framework |
-| Database | MariaDB, plain parameterised SQL, no ORM |
-| Auth | httpOnly session cookie, scrypt password hashing — no auth library |
+| Database | Supabase Postgres, row-level security, SQL migrations in `supabase/migrations/` |
+| Auth | Supabase Auth with email confirmation; httpOnly session cookies set by `api/`, never readable by the page |
 | Tests | Vitest + Testing Library |
 
 ## Run locally
@@ -80,9 +80,16 @@ npm run lint    # ESLint
 npm run test    # Vitest, once
 npm run test:watch
 npm run build   # production build
+npm run test:db # the database schema and its access rules, on a real Postgres
 ```
 
-All four run in CI on every push and pull request
+`test:db` applies `supabase/migrations/` to a throwaway database and runs
+[`supabase/tests/rls.sql`](supabase/tests/rls.sql): one account can't see or
+change another's data, a signed-out request reaches nothing, a stale save is
+a conflict, and deleting an account deletes its data. It needs a Postgres you
+can create databases on (`DATABASE_URL`, default the local socket).
+
+All five run in CI on every push and pull request
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Tests cover the
 tournament engine (standings, fixture generation, undo), every game mode's
 fixture/advancement logic, the v1→v2 save-state migration, the client/server
@@ -107,7 +114,10 @@ either action.
 
 **Cloud sync (optional):** set `VITE_API_BASE_URL=/api` and deploy the
 serverless functions under `api/` (see [`api/README.md`](api/README.md)) to
-add accounts and cross-device sync against a MariaDB database.
+add accounts and cross-device sync, backed by Supabase (Auth and Postgres).
+The browser only ever talks to `/api`; each saved tournament is stored as one
+document, exactly as the app keeps it, and the database only lets an
+account see its own rows.
 `localStorage` stays the write-through cache either way — sign-in adds a
 background sync on top of it, it doesn't replace it. A phone that loses
 signal mid-tournament keeps working normally; goals sync once the connection
@@ -152,13 +162,11 @@ Ali's row, the same rows their solo wins go on, never on a row called
 read the same way.
 
 Teams are saved on each History record, so they travel in the export file
-with everything else. The cloud backend stores them too (migration
-`003_lossless_state.sql`): a team's members on the live tournament, and the
-`teams` map on each finished History record. Signed in, a tournament or a
-record pulled back down comes back exactly as it was saved — the same goes for
-the prize and forfeit, the cards shown in a match, a dealt rule's level, and
-the World Cup groups. If you run your own backend, apply that migration
-**before** deploying this version of `api/`.
+with everything else. The cloud backend stores them too: a team's members on
+the live tournament, and the `teams` map on each finished History record.
+Signed in, a tournament or a record pulled back down comes back exactly as it
+was saved — the same goes for the prize and forfeit, the cards shown in a
+match, a dealt rule's level, and the World Cup groups.
 
 ## Prizes and the last place forfeit
 

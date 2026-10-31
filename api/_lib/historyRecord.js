@@ -1,7 +1,8 @@
-/* ---------- history record <-> rows ----------
+/* ---------- a finished tournament's history record ----------
  * Validates the record the client POSTs (the shape built in
- * src/engine/useTournament.js) and rebuilds it for GET. Kept out of the route
- * file so the round trip can be tested without a request.
+ * src/engine/useTournament.js) and builds the clean copy that is stored as
+ * jsonb and handed back on GET. Kept out of the route file so the round trip
+ * can be tested without a request.
  *
  * The core fields are coerced rather than rejected (a record from an older
  * client must still be accepted). The fields added for teams and stakes are
@@ -9,13 +10,12 @@
  * for, and a bad value should fail once with a 422 rather than be stored.
  */
 import { MODE_STAGES } from "./modes.js";
-import { ValidationError } from "./serializer.js";
+import { ValidationError } from "./state.js";
 
 const MAX_NAME = 24;
 const MAX_MEMBERS = 8;
 const MAX_PLAYERS = 64;
 
-const parseJson = (v) => (typeof v === "string" ? JSON.parse(v) : v);
 const clampCount = (n) => {
   const v = Number(n);
   return Number.isFinite(v) ? Math.max(0, Math.min(65535, Math.trunc(v))) : 0;
@@ -84,36 +84,36 @@ export function parseHistoryRecord(record) {
     topScorerName: record.topScorer && record.topScorer.name ? String(record.topScorer.name).slice(0, MAX_NAME) : null,
     topScorerGoals: record.topScorer && Number.isFinite(Number(record.topScorer.goals)) ? Math.trunc(Number(record.topScorer.goals)) : null,
     playedAt: record.date && !Number.isNaN(Date.parse(record.date)) ? new Date(record.date) : new Date(),
-    teamsJson: teams ? JSON.stringify(teams) : null,
+    teams,
     prize: optionalText(record.prize, "record.prize"),
     chore: optionalText(record.chore, "record.chore"),
-    lastPlaceJson: lastPlace ? JSON.stringify(lastPlace) : null,
+    lastPlace,
   };
 }
 
-/** One tournament_history row plus its tournament_history_players rows -> the client's record. */
-export function historyRowToRecord(r, players) {
+/** The parsed record -> the clean record that is stored and given back. */
+export function toStoredRecord(p) {
   const record = {
-    id: r.client_id,
-    date: new Date(r.played_at).toISOString(),
-    mode: r.mode,
-    players: players.map((p) => p.name),
-    champion: r.champion,
-    topScorer: r.top_scorer_name ? { name: r.top_scorer_name, goals: r.top_scorer_goals } : null,
-    totalGoals: r.total_goals,
+    id: p.clientId,
+    date: p.playedAt.toISOString(),
+    mode: p.mode,
+    players: p.players,
+    champion: p.champion,
+    topScorer: p.topScorerName ? { name: p.topScorerName, goals: p.topScorerGoals } : null,
+    totalGoals: p.totalGoals,
   };
-  // pre-002 rows never wrote these columns, so every `w` comes back
-  // NULL — that's "no results", not "0 wins", so the key is omitted
-  // entirely rather than attached with zeroes.
-  if (players.some((p) => p.w !== null)) {
-    record.results = players.map((p) => ({
-      name: p.name, played: p.played ?? 0, w: p.w ?? 0, d: p.d ?? 0, l: p.l ?? 0, gf: p.gf ?? 0, ga: p.ga ?? 0,
-    }));
+  // An older client sends no results at all: that's "no results", not
+  // "0 wins", so the key is left out rather than filled with zeroes.
+  if (p.players.some((name) => p.resultByName.has(name))) {
+    record.results = p.players.map((name) => {
+      const r = p.resultByName.get(name);
+      return { name, played: r?.played ?? 0, w: r?.w ?? 0, d: r?.d ?? 0, l: r?.l ?? 0, gf: r?.gf ?? 0, ga: r?.ga ?? 0 };
+    });
   }
   // like the client, only present when used, so a plain record keeps its old shape
-  if (r.teams_json) record.teams = parseJson(r.teams_json);
-  if (r.prize) record.prize = r.prize;
-  if (r.chore) record.chore = r.chore;
-  if (r.last_place_json) record.lastPlace = parseJson(r.last_place_json);
+  if (p.teams) record.teams = p.teams;
+  if (p.prize) record.prize = p.prize;
+  if (p.chore) record.chore = p.chore;
+  if (p.lastPlace) record.lastPlace = p.lastPlace;
   return record;
 }

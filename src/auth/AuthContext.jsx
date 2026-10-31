@@ -38,11 +38,14 @@ export function AuthProvider({ children }) {
     return res.user;
   }, []);
 
-  const register = useCallback(async ({ email, password, displayName, inviteCode }) => {
+  // Resolves to the user, or to { confirmationRequired: true } when the
+  // account exists but the email link has to be clicked before signing in.
+  const register = useCallback(async ({ email, password, displayName }) => {
     const res = await apiRequest("/auth/register", {
       method: "POST",
-      body: { email, password, displayName, inviteCode },
+      body: { email, password, displayName },
     });
+    if (res?.confirmationRequired) return { confirmationRequired: true };
     setUser(res.user);
     setSessionActive(true, res.user.id);
     return res.user;

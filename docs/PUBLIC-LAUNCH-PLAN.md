@@ -1,6 +1,9 @@
 # Public launch plan (Supabase, consent, game modes first)
 
-Status: agreed direction, not built yet. Replaces the earlier league plan.
+Status: agreed. Phase 1 (Supabase foundation) is built; phases 2 onwards are not.
+Replaces the earlier league plan.
+
+Garden Cup is a trading name of **ZD Wholesale Limited**, the data controller.
 
 ## What changed and why
 
@@ -48,12 +51,13 @@ Supabase: Auth + Postgres (RLS: a row is visible only to its owner)
 
 - **The front end barely changes.** `api/auth/register|login|logout|me` keep
   their URLs and response shapes. Only their insides move from scrypt and
-  MariaDB to Supabase Auth. The browser never holds a Supabase key, and the
+  MariaDB to Supabase Auth. Sign-up now waits for the email link
+  (`/api/auth/confirm`). The browser never holds a Supabase key, and the
   CSP (`connect-src 'self'`) stays as it is.
 - **Defence in depth:** the API queries with the user's session, not the
   service key, so Postgres row-level security (`user_id = auth.uid()`) still
   blocks a bug in a handler from reading someone else's data. The service key
-  is used only for account deletion.
+  will be needed only for account deletion (phase 2).
 - **Simpler storage:** tournaments and history are stored as `jsonb`
   documents, which is lossless by construction. `api/_lib/serializer.js`
   (about 400 lines) and its mapping tables are deleted.
@@ -65,18 +69,17 @@ Supabase: Auth + Postgres (RLS: a row is visible only to its owner)
 ### Schema (`supabase/migrations/`)
 
 ```
-profiles      id = auth.users.id, display_name, created_at
-consents      id, user_id, kind (terms|privacy|guardian|age18), version, accepted_at
-tournaments   id, user_id, client_id, mode, state jsonb, version, history_saved, updated_at
-tournament_history  id, user_id, client_id, record jsonb, finished_at
+tournaments         id, user_id, client_id, mode, state jsonb, history_saved, status, version   (phase 1)
+tournament_history  id, user_id, client_id, mode, played_at, record jsonb                      (phase 1)
+consents            id, user_id, kind (terms|privacy|guardian|age18), version, accepted_at      (phase 2)
 ```
 
 RLS is on for every table, and each policy is owner-only. Deleting the auth
-user cascades to everything.
+user cascades to everything. The display name lives on the Supabase user
+(`user_metadata.display_name`), so there is no separate profiles table.
 
-Env vars: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (used server-side by the API
-only), and `SUPABASE_SERVICE_ROLE_KEY` (account deletion only). Remove the
-`DB_*`, `TOKEN_TTL_DAYS` and `SIGNUP_INVITE_CODE` vars and the `mariadb` dependency.
+Env vars: `SUPABASE_URL` and `SUPABASE_ANON_KEY` (server-side only).
+`SUPABASE_SERVICE_ROLE_KEY` arrives with account deletion in phase 2.
 
 ## Sign-up, consent and legal
 
@@ -121,10 +124,12 @@ fee; most organisations that process personal data do.
 
 Each phase is its own PR with tests, merged in order.
 
-1. **Supabase foundation**: migrations, RLS, and `api/_lib` rewritten on
-   `@supabase/ssr`, keeping the same endpoints. Remove MariaDB, `migrations/`,
-   `serializer.js` and the custom auth. Update `README.md`, `DEPLOYMENT.md`
-   and `api/README.md`. The existing sync tests must stay green.
+1. **Supabase foundation** (built): migrations, RLS and the
+   `save_current_tournament` function in `supabase/migrations/`; `api/`
+   rewritten on `@supabase/ssr` with the same endpoints, plus email
+   confirmation. MariaDB, `migrations/`, `serializer.js` and the custom auth
+   are removed. Access rules are tested on a real Postgres (`npm run test:db`,
+   also in CI).
 2. **Sign-up consent and legal pages**: the consent checkboxes, the `consents`
    table, re-consent on a version change, the Privacy, Terms, Safeguarding
    and Cookie pages, and account deletion.
@@ -142,10 +147,11 @@ Each phase is its own PR with tests, merged in order.
    mode contract. Whatever the model, never sell randomised content
    (no paid random rule packs); see the audit.
 
+## Decided
+- **No existing MariaDB users**: nothing to copy across; everyone starts fresh.
+- **Supabase region**: London (eu-west-2).
+- **Data controller**: ZD Wholesale Limited, trading as Garden Cup.
+
 ## Still open
-1. **Existing MariaDB data:** is anyone using the current cloud sync? If so,
-   copy those accounts over once (users would need to reset their password,
-   since the old hashes don't carry across). If not, start fresh.
-2. **Supabase region:** London (eu-west-2) is assumed.
-3. **Who signs the policies:** the business or person named as data
-   controller, plus a contact email for privacy and safeguarding requests.
+1. The contact email for privacy and safeguarding requests (needed for the
+   policies in phase 2).
