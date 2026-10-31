@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
-import App from "../src/App.jsx";
+import { cleanup, screen, fireEvent } from "@testing-library/react";
+import { renderApp } from "./helpers/renderApp.jsx";
 
 afterEach(() => {
   cleanup();
@@ -10,7 +10,7 @@ afterEach(() => {
 
 describe("App", () => {
   it("mounts and shows the hero and the default mode's setup screen", () => {
-    render(<App />);
+    renderApp();
     expect(screen.getByText("GARDEN CUP")).toBeInTheDocument();
     expect(screen.getByText("Game mode")).toBeInTheDocument();
     expect(screen.getByText("League + Final")).toBeInTheDocument();
@@ -18,7 +18,7 @@ describe("App", () => {
   });
 
   it("enables the Wins tab with no live tournament, while Stats stays disabled", () => {
-    render(<App />);
+    renderApp();
     const winsTab = screen.getByRole("button", { name: "Wins" });
     const statsTab = screen.getByRole("button", { name: "Stats" });
     expect(winsTab).not.toBeDisabled();
@@ -29,7 +29,7 @@ describe("App", () => {
   });
 
   it("has a speaker toggle in the hero, on by default, reachable with no tournament in progress", () => {
-    render(<App />);
+    renderApp();
     const speakerBtn = screen.getByRole("button", { name: /voice/i });
     expect(speakerBtn).toHaveAttribute("aria-pressed", "true");
 

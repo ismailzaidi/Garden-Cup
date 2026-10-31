@@ -65,6 +65,7 @@ export default {
   key: "chaos",
   label: "Chaos Cup",
   desc: "Every match has a random silly rule",
+  age: "All ages",
   icon: Dices,
   minPlayers: 2,
   stages: ["chaos"],

@@ -21,23 +21,33 @@ works for `vercel dev` locally; it's already gitignored.
 |---|---|---|
 | `SUPABASE_URL` | yes | Project Settings → API → Project URL. |
 | `SUPABASE_ANON_KEY` | yes | Project Settings → API → the anon (publishable) key. Used server-side only, always with the user's session, so it can only do what row-level security lets that user do. |
+| `SUPABASE_SERVICE_ROLE_KEY` | for account deletion | Project Settings → API → the service-role (secret) key. Bypasses row-level security, so it is used in exactly one place: `DELETE /api/account`, after the password is checked, to delete the user (Supabase only lets an admin do that). Without it, that route replies `503` and nothing else changes. |
 
-Without them every route replies `503 not_configured`. The service-role key
-is **not** used anywhere in this version; never set it as a Vercel variable
-until something needs it.
+Without the first two every route replies `503 not_configured`.
 
 ## Routes
 
 | Route | Methods | What it does |
 |---|---|---|
 | `/api/auth/register` | POST | `{email, password, displayName}`. `201 {user}` if signed straight in, or `202 {confirmationRequired: true}` when the email link must be clicked first (the normal case). |
-| `/api/auth/confirm` | GET | The link in the confirmation email. Signs the user in and redirects to `/?confirmed=1`, or to `/?confirm_error=1`. |
+| `/api/auth/confirm` | GET | The link in the confirmation and reset emails. Signs the user in and redirects to `/?confirmed=1` (or `/?reset=1` for a reset), or to `/?confirm_error=1`. |
 | `/api/auth/login` | POST | `{email, password}` → `{user}`. |
-| `/api/auth/logout` | POST | Ends this device's session. |
+| `/api/auth/logout` | POST | Ends this device's session, or every session with `{everywhere: true}`. |
 | `/api/auth/me` | GET | `{user}` or 401. |
+| `/api/auth/forgot` | POST | `{email}` → always `{sent: true}` (so it can't reveal who has an account); emails a reset link. |
+| `/api/account` | PATCH, POST, DELETE | My account. PATCH `{displayName}` → `{user}`. POST `{currentPassword, newPassword}` changes the password (`currentPassword` may be left out within an hour of a reset email). DELETE `{password}` deletes the account and, by cascade, all its data. |
 | `/api/tournaments/current` | GET, PUT, DELETE | The tournament in progress. PUT is `{expectedVersion, state}` → `{version}`, or `409 {version, state}` when another device saved first. |
 | `/api/history` | GET, POST, DELETE | Finished tournaments. POST is idempotent on the record's id. |
 | `/api/history/:clientId` | DELETE | One history record. |
+
+## Rate limits
+
+Every route except `me` and `logout` calls `rateLimit` from
+[`_lib/rateLimit.js`](_lib/rateLimit.js) before doing any work, keyed on the
+real client IP (Vercel's own `x-vercel-forwarded-for`), the email, or the
+account, as fits the route. Over the limit is `429 too_many_requests` with a
+`Retry-After` header in seconds. The limits and why they are set where they
+are: DEPLOYMENT.md, "Rate limits". A new route must add a limit too.
 
 ## Request/response shape
 
@@ -72,3 +82,9 @@ function are in [`../supabase/migrations/`](../supabase/migrations/);
   origin, as in production. Needed to test sign-in or sync. Requires a
   `.env.local` with the variables above and `VITE_API_BASE_URL=/api`. Point
   it at a separate Supabase project for development, never production.
+
+## Function count
+
+Each route file is one Vercel serverless function. There are 10; Vercel's
+free (Hobby) plan allows 12 per deployment, so prefer adding a method to an
+existing route (as `/api/account` does) over a new file.

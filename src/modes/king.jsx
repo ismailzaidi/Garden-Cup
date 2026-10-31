@@ -182,6 +182,7 @@ export default {
   key: "king",
   label: "Winner Stays On",
   desc: "Beat the king, queue to challenge",
+  age: "All ages",
   icon: Crown,
   minPlayers: 2,
   stages: ["king"],

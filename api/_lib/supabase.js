@@ -10,6 +10,7 @@
  * session is written back through setAll before the handler replies.
  */
 import { createServerClient, parseCookieHeader, serializeCookieHeader } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 
 export function supabaseConfigured() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
@@ -54,5 +55,31 @@ export function cookieMethods(req, res) {
 export function createRequestClient(req, res) {
   return createServerClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
     cookies: cookieMethods(req, res),
+  });
+}
+
+/* A throwaway client with no cookies: signs in only to check a password
+   (changing it, deleting the account), then signs that extra session out,
+   so the user's own session cookies are never touched. */
+export async function passwordMatches(email, password) {
+  const temp = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+  });
+  const { error } = await temp.auth.signInWithPassword({ email, password });
+  if (error) return { ok: false, error };
+  await temp.auth.signOut({ scope: "local" }).catch(() => {});
+  return { ok: true };
+}
+
+/* The service-role client. Used for exactly one thing: deleting an account
+   (Supabase only lets an admin delete a user). Never used for data queries,
+   and only on the server, from SUPABASE_SERVICE_ROLE_KEY. */
+export function adminConfigured() {
+  return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
+export function createAdminClient() {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 }

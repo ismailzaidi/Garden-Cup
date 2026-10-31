@@ -1,5 +1,6 @@
 import { sendJson, sendError, methodGuard, withErrorHandling, bodyTooLarge } from "../_lib/http.js";
 import { requireAuth } from "../_lib/auth.js";
+import { rateLimit } from "../_lib/rateLimit.js";
 import { validateState, toStoredState, ValidationError } from "../_lib/state.js";
 
 /* The tournament in progress. PUT carries the version the client last saw;
@@ -12,6 +13,7 @@ export default withErrorHandling(async (req, res) => {
   const auth = await requireAuth(req, res);
   if (!auth) return;
   const { user, db } = auth;
+  if (!(await rateLimit(res, db, [["dataUser", user.id]]))) return;
 
   if (req.method === "GET") {
     const { data, error } = await db.from("tournaments")

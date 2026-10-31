@@ -70,6 +70,7 @@ export default {
   key: "horror",
   label: "Horror",
   desc: "Sealed dark rules — winning might be the worst thing you do",
+  age: "8+", // spooky theme and secret result-changing cards: see docs/MODE-AUDIT.md
   icon: Skull,
   minPlayers: 2,
   stages: ["horror"],

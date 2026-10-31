@@ -95,6 +95,12 @@ describe("apiRequest", () => {
       expect(e.body).toEqual({ error: "conflict", version: 3, state: { mode: "king" } });
     }
   });
+
+  it("reads a 429's Retry-After (seconds) onto the ApiError", async () => {
+    const res = { ...jsonResponse(429, { error: "too_many_requests", message: "slow down" }), headers: new Headers({ "Retry-After": "42" }) };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(res));
+    await expect(apiRequest("/history", { method: "POST" })).rejects.toMatchObject({ status: 429, retryAfter: 42 });
+  });
 });
 
 describe("onUnauthorized", () => {

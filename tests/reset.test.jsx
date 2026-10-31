@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { describe, it, expect, afterEach } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
-import App from "../src/App.jsx";
+import { cleanup, screen, fireEvent } from "@testing-library/react";
+import { renderApp } from "./helpers/renderApp.jsx";
 
 afterEach(() => {
   cleanup();
@@ -20,7 +20,7 @@ function clickText(text) {
 
 describe("New / reset", () => {
   it("keeps the player roster but clears fixtures and the mode badge", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("1"); // legs per pairing
@@ -41,7 +41,7 @@ describe("New / reset", () => {
   });
 
   it("re-persists the kept roster (not just an in-memory reset) so a reload after New doesn't lose it", async () => {
-    render(<App />);
+    renderApp();
     addPlayer("Alice");
     addPlayer("Bob");
     clickText("1");

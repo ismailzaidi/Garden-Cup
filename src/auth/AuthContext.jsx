@@ -51,10 +51,35 @@ export function AuthProvider({ children }) {
     return res.user;
   }, []);
 
-  const logout = useCallback(async () => {
+  // { everywhere: true } also ends the account's sessions on other devices.
+  const logout = useCallback(async ({ everywhere = false } = {}) => {
     setUser(null);
     setSessionActive(false);
-    try { await apiRequest("/auth/logout", { method: "POST" }); } catch { /* best-effort */ }
+    try { await apiRequest("/auth/logout", { method: "POST", body: { everywhere } }); } catch { /* best-effort */ }
+  }, []);
+
+  const forgotPassword = useCallback(async (email) => {
+    await apiRequest("/auth/forgot", { method: "POST", body: { email } });
+  }, []);
+
+  const updateDisplayName = useCallback(async (displayName) => {
+    const res = await apiRequest("/account", { method: "PATCH", body: { displayName } });
+    setUser(res.user);
+    return res.user;
+  }, []);
+
+  // currentPassword is left out only after a "forgot password" link.
+  const changePassword = useCallback(async ({ currentPassword, newPassword }) => {
+    await apiRequest("/account", { method: "POST", body: { currentPassword, newPassword } });
+  }, []);
+
+  // The server deletes the account and everything it owns. This device's
+  // own copy (localStorage) is kept: it was never the account's to delete,
+  // and the person can clear it from History.
+  const deleteAccount = useCallback(async (password) => {
+    await apiRequest("/account", { method: "DELETE", body: { password } });
+    setUser(null);
+    setSessionActive(false);
   }, []);
 
   const value = useMemo(() => ({
@@ -64,7 +89,11 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
-  }), [cloud, user, ready, login, register, logout]);
+    forgotPassword,
+    updateDisplayName,
+    changePassword,
+    deleteAccount,
+  }), [cloud, user, ready, login, register, logout, forgotPassword, updateDisplayName, changePassword, deleteAccount]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

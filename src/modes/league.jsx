@@ -118,6 +118,7 @@ export default {
   key: "league",
   label: "League + Final",
   desc: "Round robin, then the top 2 play off — or no final",
+  age: "All ages",
   icon: ListOrdered,
   minPlayers: 2,
   stages: ["group", "final"],
