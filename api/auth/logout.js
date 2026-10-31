@@ -1,13 +1,14 @@
-import { withConnection } from "../_lib/db.js";
 import { methodGuard, withErrorHandling } from "../_lib/http.js";
-import { getSessionToken, hashToken, clearSessionCookie } from "../_lib/auth.js";
+import { createRequestClient, supabaseConfigured } from "../_lib/supabase.js";
 
+/* Ends this device's session only (other devices stay signed in). The
+   client clears its cookies even if Supabase can't be reached. */
 export default withErrorHandling(async (req, res) => {
   if (!methodGuard(req, res, ["POST"])) return;
-  const token = getSessionToken(req);
-  if (token) {
-    await withConnection((conn) => conn.query("DELETE FROM auth_tokens WHERE token_hash=?", [hashToken(token)])).catch((e) => console.error(e));
+  if (supabaseConfigured()) {
+    const db = createRequestClient(req, res);
+    const { error } = await db.auth.signOut({ scope: "local" });
+    if (error) console.error(error);
   }
-  clearSessionCookie(res, req);
   res.status(204).end();
 });

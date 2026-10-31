@@ -35,8 +35,8 @@ export function getClientIp(req) {
   return req.socket?.remoteAddress || null;
 }
 
-// Wraps a route handler so an unexpected exception (a PDO-equivalent driver
-// error, a bad query, anything) becomes a generic 500 instead of leaking a
+// Wraps a route handler so an unexpected exception (a database or Supabase
+// error, anything) becomes a generic 500 instead of leaking a
 // stack trace or a database error string to the client. Real detail goes to
 // the function log via console.error.
 export function withErrorHandling(handler) {
