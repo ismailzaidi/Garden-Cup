@@ -37,17 +37,10 @@ accounts and cross-device sync on top of it.
    (eu-west-2)**. Keep the database password somewhere safe; nothing in this
    repo needs it.
 
-2. **Apply the schema.** Either with the Supabase CLI:
-
-   ```bash
-   supabase link --project-ref <project-ref>
-   supabase db push
-   ```
-
-   or paste each file in `supabase/migrations/` into the dashboard's SQL
-   editor, oldest first. **Apply a migration before deploying the API version
-   that needs it.** Migrations are never edited once applied; a change is a
-   new, later-dated file.
+2. **Connect the migration deploy** (see [Deploying database changes](#deploying-database-changes)
+   below): add the three repository secrets, then run the **Deploy database**
+   workflow once from the Actions tab. That applies every file in
+   `supabase/migrations/`; you never paste SQL into the dashboard.
 
 3. **Configure Auth** (Authentication in the dashboard):
    - **Providers**: Email on, **Confirm email on**. Leave every other
@@ -97,6 +90,55 @@ No credential, hostname, or connection string belongs in this repo at any
 point: not in a commit, not in a comment, not in an example. Only variable
 *names* are documented; values live in Vercel's environment variable store
 (or a gitignored local `.env.local` for `vercel dev`).
+
+## Deploying database changes
+
+Schema changes are files in `supabase/migrations/`, deployed by
+[`.github/workflows/deploy-db.yml`](.github/workflows/deploy-db.yml) when
+they reach `main`. Supabase keeps a list of the migrations it has run, so
+each deploy applies only the new files, in name order.
+
+**One-time setup.** In GitHub, **Settings → Secrets and variables → Actions
+→ New repository secret**, add:
+
+| Secret | Where it comes from |
+|---|---|
+| `SUPABASE_ACCESS_TOKEN` | Supabase dashboard → your avatar → **Account → Access Tokens → Generate new token** |
+| `SUPABASE_PROJECT_ID` | The production project's ref: **Project Settings → General → Project ID** (also the `xxxx` in `xxxx.supabase.co`) |
+| `SUPABASE_DB_PASSWORD` | The database password chosen when the project was created (reset it under **Project Settings → Database** if lost) |
+
+Then **Actions → Deploy database → Run workflow** once to create the tables.
+
+**Every change after that (works from a phone):**
+
+1. Ask Claude (in the Claude app) for the change. It adds a new migration
+   file, adds checks to `supabase/tests/rls.sql` where access rules change,
+   and opens a pull request.
+2. CI runs the migrations and the access tests on a throwaway Postgres.
+3. Merge the pull request in the GitHub app.
+4. **Deploy database** runs: the tests again, a dry run listing what will
+   be applied (visible in the job log), then the real push. A failed
+   migration is rolled back and the job goes red; GitHub emails you.
+
+**Rules that keep this safe:**
+
+- **Never change the schema in the Supabase dashboard** (Table Editor or
+  SQL editor). The files in the repo are the only source of truth; a
+  dashboard edit makes production differ from what the tests check.
+  Looking at data in the dashboard is fine.
+- **Never edit or rename a migration that has been deployed.** Fix it with
+  a new, later file.
+- **Additive first.** Vercel deploys the app at the same moment the
+  migration runs, so a release must work with both the old and new schema
+  for a minute: add columns or tables in one release, start using them in
+  the same or a later one, and only remove things in a later release still.
+- **Preview/development project**: run the workflow by hand against it if
+  needed by temporarily pointing the secrets at it, or apply migrations to
+  it with `supabase db push --project-ref <dev-ref>` from a computer.
+
+Optional: GitHub can require an approval before the deploy job runs
+(**Settings → Environments → production → Required reviewers**). On a
+private repository this needs a paid GitHub plan.
 
 ## Local development
 

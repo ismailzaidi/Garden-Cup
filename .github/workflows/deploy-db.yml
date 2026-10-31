@@ -1,0 +1,74 @@
+# Applies new files in supabase/migrations/ to the production Supabase
+# project whenever they reach main, so schema changes never need pasting
+# into the dashboard. Supabase records which migrations have run, so each
+# deploy applies only the new ones, in filename order.
+#
+# Needs three repository secrets (Settings -> Secrets and variables ->
+# Actions), all from the Supabase dashboard; see DEPLOYMENT.md:
+#   SUPABASE_ACCESS_TOKEN  a personal access token (Account -> Access Tokens)
+#   SUPABASE_PROJECT_ID    the project ref (Project Settings -> General)
+#   SUPABASE_DB_PASSWORD   the database password set when the project was made
+name: Deploy database
+
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/migrations/**"]
+  workflow_dispatch: # run it by hand from the Actions tab (also works in the GitHub mobile app)
+
+# Never two deploys at once, and never cancel one halfway.
+concurrency:
+  group: deploy-db
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+      - run: npm run test:db
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the secrets are set
+        run: |
+          missing=""
+          for v in SUPABASE_ACCESS_TOKEN SUPABASE_PROJECT_ID SUPABASE_DB_PASSWORD; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing. See DEPLOYMENT.md, 'Deploying database changes'."
+            exit 1
+          fi
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Migrations that will be applied
+        run: supabase db push --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --dry-run
+
+      - name: Apply them
+        run: supabase db push --project-ref "$SUPABASE_PROJECT_ID" --password "$SUPABASE_DB_PASSWORD" --yes
